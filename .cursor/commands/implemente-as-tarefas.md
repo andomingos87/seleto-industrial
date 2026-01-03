@@ -1,0 +1,1 @@
+Implemente as tarefas e atualize o documento após conclui-las.

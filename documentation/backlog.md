@@ -32,49 +32,64 @@
 
 ---
 
-### TECH-002: Configurar Supabase — Schema de Banco de Dados
+### TECH-002: Configurar Supabase — Schema de Banco de Dados ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar tabelas `leads`, `orcamentos` e `empresa` no Supabase conforme dicionário de dados do PRD.
 - **Critérios de Aceitação**:
-  - [ ] Tabela `leads` com campos: id (uuid PK), phone (unique), name, temperature, city, uf, produto_interesse, volume_estimado, urgencia_compra, updated_at
-  - [ ] Tabela `orcamentos` com campos: id (uuid PK), lead (FK), resumo, produto, segmento, urgencia_compra, volume_diario, oportunidade_pipe_id, created_at
-  - [ ] Tabela `empresa` com campos: id (uuid PK), nome, cidade, uf, cnpj (unique quando presente), site, email, telefone, contato (FK), created_at
-  - [ ] RLS ativado em todas as tabelas
-  - [ ] Migration scripts versionados
+  - [x] Tabela `leads` com campos: id (uuid PK), phone (unique), name, temperature, city, uf, produto_interesse, volume_estimado, urgencia_compra, updated_at
+  - [x] Tabela `orcamentos` com campos: id (uuid PK), lead (FK), resumo, produto, segmento, urgencia_compra, volume_diario, oportunidade_pipe_id, created_at
+  - [x] Tabela `empresa` com campos: id (uuid PK), nome, cidade, uf, cnpj (unique quando presente), site, email, telefone, contato (FK), created_at
+  - [x] RLS ativado em todas as tabelas
+  - [x] Migration scripts versionados
 - **Dependências**: Nenhuma
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-03
+- **Migrations aplicadas**:
+  - `20260103152411_add_missing_fields_to_leads`
+  - `20260103152423_add_cnpj_unique_constraint_to_empresa`
+  - `20260103152432_enable_rls_on_all_tables`
 
 ---
 
-### TECH-003: Configurar gestão de segredos
+### TECH-003: Configurar gestão de segredos ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Implementar gestão segura de credenciais (API keys, tokens) usando variáveis de ambiente no runtime, sem hardcode no repositório.
 - **Critérios de Aceitação**:
-  - [ ] Todas as credenciais carregadas via variáveis de ambiente
-  - [ ] Nenhum token/chave presente em arquivos versionados (validar com grep)
-  - [ ] Documentação de quais variáveis são necessárias
-  - [ ] Suporte a rotação de credenciais sem redeploy (quando aplicável)
+  - [x] Todas as credenciais carregadas via variáveis de ambiente
+  - [x] Nenhum token/chave presente em arquivos versionados (validar com grep)
+  - [x] Documentação de quais variáveis são necessárias
+  - [x] Suporte a rotação de credenciais sem redeploy (quando aplicável)
 - **Dependências**: TECH-001
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-03
+- **Artefatos**:
+  - `.env.example` — Template com todas as variáveis documentadas
+  - `src/config/settings.py` — Carregamento via Pydantic Settings
+  - `README.md` — Documentação das variáveis de ambiente
 
 ---
 
-### TECH-004: Configurar logging estruturado
+### TECH-004: Configurar logging estruturado ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Implementar logging estruturado (JSON) com contexto por requisição (request_id, phone, etapa do fluxo).
 - **Critérios de Aceitação**:
-  - [ ] Logs em formato JSON com campos: timestamp, level, message, request_id, phone (quando disponível)
-  - [ ] Níveis de log configuráveis via variável de ambiente
-  - [ ] Logs de entrada/saída de webhooks
-  - [ ] Logs de chamadas a APIs externas (PipeRun, Supabase)
+  - [x] Logs em formato JSON com campos: timestamp, level, message, request_id, phone (quando disponível)
+  - [x] Níveis de log configuráveis via variável de ambiente
+  - [x] Logs de entrada/saída de webhooks
+  - [x] Logs de chamadas a APIs externas (PipeRun, Supabase)
 - **Dependências**: TECH-001
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-03
+- **Artefatos**:
+  - `src/utils/logging.py` — Módulo de logging estruturado com JSONFormatter e TextFormatter
+  - `src/api/middleware/logging.py` — Middleware FastAPI para logging de requests
+  - Funções utilitárias: `log_webhook_received()`, `log_webhook_response()`, `log_api_call()`
 
 ---
 

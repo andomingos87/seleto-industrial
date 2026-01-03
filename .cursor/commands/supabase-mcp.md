@@ -1,0 +1,1 @@
+Use o Supabase MCP

@@ -114,6 +114,48 @@ ruff format src/ tests/
 
 Consulte o arquivo `.env.example` para todas as variáveis disponíveis.
 
+#### Variáveis Obrigatórias
+
+| Variável | Descrição | Exemplo |
+|----------|-----------|---------|
+| `OPENAI_API_KEY` | Chave da API OpenAI | `sk-...` |
+| `SUPABASE_URL` | URL do projeto Supabase | `https://xxx.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Chave service_role do Supabase | `eyJ...` |
+
+#### Variáveis de Integração
+
+| Variável | Descrição | Obrigatória |
+|----------|-----------|-------------|
+| `PIPERUN_API_TOKEN` | Token da API PipeRun | MVP |
+| `PIPERUN_PIPELINE_ID` | ID do pipeline de vendas | MVP |
+| `PIPERUN_STAGE_ID` | ID do estágio inicial | MVP |
+| `PIPERUN_ORIGIN_ID` | ID da origem do lead | MVP |
+| `WHATSAPP_API_URL` | URL da API do provedor WhatsApp | MVP |
+| `WHATSAPP_API_TOKEN` | Token de autenticação WhatsApp | MVP |
+| `WHATSAPP_WEBHOOK_SECRET` | Secret para validar webhooks | MVP |
+| `CHATWOOT_API_URL` | URL da instância Chatwoot | MVP |
+| `CHATWOOT_API_TOKEN` | Token da API Chatwoot | MVP |
+| `CHATWOOT_ACCOUNT_ID` | ID da conta no Chatwoot | MVP |
+
+#### Variáveis de Configuração
+
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `APP_ENV` | Ambiente de execução | `development` |
+| `DEBUG` | Modo debug | `false` |
+| `LOG_LEVEL` | Nível de log | `INFO` |
+| `LOG_FORMAT` | Formato do log (`json` ou `text`) | `json` |
+| `HOST` | Host do servidor | `0.0.0.0` |
+| `PORT` | Porta do servidor | `8000` |
+| `OPENAI_MODEL` | Modelo OpenAI | `gpt-4o` |
+
+#### Rotação de Credenciais
+
+Para rotacionar credenciais sem redeploy:
+1. Atualize a variável de ambiente no ambiente de execução
+2. O serviço carregará automaticamente no próximo request (para integrações que suportam)
+3. Para credenciais críticas (Supabase, OpenAI), um restart pode ser necessário
+
 ## Licença
 
 Proprietário - Seleto Industrial
