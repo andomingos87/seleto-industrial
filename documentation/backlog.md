@@ -97,52 +97,65 @@
 
 > Receber e processar mensagens do provedor WhatsApp.
 
-### TECH-005: Implementar webhook de recebimento de mensagens (texto)
+### TECH-005: Implementar webhook de recebimento de mensagens (texto) ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar endpoint POST para receber webhooks do provedor WhatsApp com mensagens de texto.
 - **Critérios de Aceitação**:
-  - [ ] Endpoint `POST /webhook/whatsapp` funcional
-  - [ ] Parsing correto de payload com campos: phone, senderName, message (texto)
-  - [ ] Validação de token/header de autenticação do provedor
-  - [ ] Normalização do telefone para formato E.164 (apenas dígitos)
-  - [ ] Resposta 200 em até 2s (processamento assíncrono se necessário)
-  - [ ] Logs de entrada com phone e tipo de mensagem
+  - [x] Endpoint `POST /webhook/whatsapp` funcional
+  - [x] Parsing correto de payload com campos: phone, senderName, message (texto)
+  - [x] Validação de token/header de autenticação do provedor
+  - [x] Normalização do telefone para formato E.164 (apenas dígitos)
+  - [x] Resposta 200 em até 2s (processamento assíncrono se necessário)
+  - [x] Logs de entrada com phone e tipo de mensagem
 - **Dependências**: TECH-001, TECH-004
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-03
+- **Artefatos**:
+  - `src/api/routes/webhook.py` — Endpoint POST /webhook/whatsapp com parsing e validação
+  - `src/utils/validation.py` — Funções de normalização de telefone (normalize_phone, validate_phone)
 
 ---
 
-### TECH-006: Implementar envio de mensagens via WhatsApp
+### TECH-006: Implementar envio de mensagens via WhatsApp ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar serviço para enviar mensagens de texto via API do provedor WhatsApp.
 - **Critérios de Aceitação**:
-  - [ ] Função `send_whatsapp_message(phone, text)` implementada
-  - [ ] Retry com backoff exponencial em caso de falha (até 3 tentativas)
-  - [ ] Logs de sucesso/falha com phone e status
-  - [ ] Tratamento de rate limit do provedor
+  - [x] Função `send_whatsapp_message(phone, text)` implementada
+  - [x] Retry com backoff exponencial em caso de falha (até 3 tentativas)
+  - [x] Logs de sucesso/falha com phone e status
+  - [x] Tratamento de rate limit do provedor
 - **Dependências**: TECH-001, TECH-003
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-03
+- **Artefatos**:
+  - `src/services/whatsapp.py` — Serviço WhatsAppService com retry e backoff exponencial
+  - Função `send_whatsapp_message()` para envio de mensagens
 
 ---
 
-### TECH-007: Implementar recebimento e transcrição de áudio
+### TECH-007: Implementar recebimento e transcrição de áudio ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Processar mensagens de áudio recebidas via webhook, baixar arquivo e transcrever para texto.
 - **Critérios de Aceitação**:
-  - [ ] Parsing de payload com objeto `audio` (audioUrl, mimeType, seconds)
-  - [ ] Download do arquivo de áudio via URL
-  - [ ] Integração com serviço de transcrição (ex: Whisper API)
-  - [ ] Texto transcrito disponível para processamento pelo agente
-  - [ ] Log indicando que mensagem era áudio + duração
-  - [ ] Fallback/erro tratado se transcrição falhar
+  - [x] Parsing de payload com objeto `audio` (audioUrl, mimeType, seconds)
+  - [x] Download do arquivo de áudio via URL
+  - [x] Integração com serviço de transcrição (ex: Whisper API)
+  - [x] Texto transcrito disponível para processamento pelo agente
+  - [x] Log indicando que mensagem era áudio + duração
+  - [x] Fallback/erro tratado se transcrição falhar
 - **Dependências**: TECH-005
 - **Prioridade**: Média
 - **Fase**: Fase 2
+- **Concluído em**: 2026-01-03
+- **Artefatos**:
+  - `src/services/transcription.py` — Serviço TranscriptionService com integração Whisper API
+  - Função `transcribe_audio()` para transcrição de áudio
+  - Suporte a múltiplos formatos de áudio (ogg, mp3, wav, webm, etc.)
 
 ---
 

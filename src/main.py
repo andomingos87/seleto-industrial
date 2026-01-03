@@ -8,6 +8,7 @@ from agno.os import AgentOS
 
 from src.api.middleware.logging import LoggingMiddleware
 from src.api.routes.health import router as health_router
+from src.api.routes.webhook import router as webhook_router
 from src.config.settings import settings
 from src.utils.logging import get_logger
 
@@ -41,6 +42,7 @@ app.add_middleware(LoggingMiddleware)
 
 # Registrar rotas customizadas
 app.include_router(health_router, tags=["Health"])
+app.include_router(webhook_router, tags=["Webhooks"])
 
 # Log startup
 logger.info(
