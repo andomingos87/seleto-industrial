@@ -1,0 +1,893 @@
+{
+  "name": "MCP - SELETO",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "mcp-seleto"
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        224
+      ],
+      "id": "52f3941c-095f-4042-9207-ec30a520580b",
+      "name": "MCP Server Trigger",
+      "webhookId": "94579548-f7d9-44bd-a44e-7feac368e8ff"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "=Atualiza nome do lead no banco de dados.\nUse para salvar o nome do lead.\n\nEnvie os parametros:\nphone: \"Telefone do cliente no formato: 5511945207618\",\nname: \"Nome do cliente\"\n\nRegras: Atualize o nome do lead silenciosamente, não precisa avisar que atualizou no banco de dados;",
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "phone",
+              "condition": "eq",
+              "keyValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('conditions0_Field_Value', `Telefone do cliente`, 'string') }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues0_Field_Value', `Nome do Cliente`, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        768
+      ],
+      "id": "89db8c19-318e-4ab5-ae39-0d67fd83cd13",
+      "name": "atualiza_nome",
+      "credentials": {
+        "supabaseApi": {
+          "id": "oRO3WPWVgAHBgmrD",
+          "name": "Supabase Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "=Vincula um orçamento ao lead\nInput: ID do Orçamento",
+        "operation": "update",
+        "tableId": "leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "orcamentos",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues0_Field_Value', `ID do Orçamento`, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        16,
+        768
+      ],
+      "id": "dbc2147d-2a1f-4de2-822c-80257c1d440c",
+      "name": "atualiza_lead_orcamento",
+      "credentials": {
+        "supabaseApi": {
+          "id": "oRO3WPWVgAHBgmrD",
+          "name": "Supabase Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "=Gera um novo orçamento;\n\nParametros de entrada:\nlead: ID do lead (string)\nresumo: Resumo da conversa (string)\nproduto: Nome do produto (string)\nsegmento: Segmento (string)\nurgencia_compra: Urgencia da compra (string)\nvolume_diario: Volume diário de produção (integer)",
+        "tableId": "orcamentos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues0_Field_Value', `Lead da conversa atual (leads)`, 'string') }}"
+            },
+            {
+              "fieldId": "resumo",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues1_Field_Value', `Resumo da conversa (text)`, 'string') }}"
+            },
+            {
+              "fieldId": "produto",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues2_Field_Value', `Nome do produto (text)`, 'string') }}"
+            },
+            {
+              "fieldId": "segmento",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues3_Field_Value', `Segmento do produto (text)`, 'string') }}"
+            },
+            {
+              "fieldId": "urgencia_compra",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues4_Field_Value', `Urgencia da compra (text)`, 'string') }}"
+            },
+            {
+              "fieldId": "volume_diario",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues5_Field_Value', `Volume diário de produção (integer)`, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        1104
+      ],
+      "id": "cc6fa122-06c1-4116-8797-6c8be244a5f7",
+      "name": "cria_orcamento",
+      "credentials": {
+        "supabaseApi": {
+          "id": "oRO3WPWVgAHBgmrD",
+          "name": "Supabase Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Categoria a temperatura do lead classificando em frio, morno e quente. Envie o resumo da conversa e o telefone do lead.",
+        "workflowId": {
+          "__rl": true,
+          "value": "Ir5c4MT1HzkvcOOg",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Ir5c4MT1HzkvcOOg",
+          "cachedResultName": "tool:temperatura_lead"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "resumo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('resumo', `Resumo da conversa com o lead`, 'string') }}",
+            "telefone": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('telefone', `Telefone do lead no formato DDI, DDD, Numero.\n\nExemplos:\n\"5511945207618\"\n\"5511989546623\"\n\"554598785421\"\n\"552456877854\"`, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "resumo",
+              "displayName": "resumo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "telefone",
+              "displayName": "telefone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1936,
+        768
+      ],
+      "id": "410e60d4-b73b-434e-b80b-be0b6aa10898",
+      "name": "temperatura_lead"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "=Cria uma nova empresa no banco de dados;\n\nParametros de entrada:\nnome: Nome da empresa;\ncidade: Cidade;\nuf: UF do estado;\ncnpj: Número do CNPJ. Sem caracteres especiais, somente numeros no formato exemplo: \"34316402000111\";\nsite: Site da empresa no formato domínio válido;\nemail: Email da empresa no formato válido;\ntelefone: telefone da empresa no formato: \"5511945207618\" ou \"551189546623\";\ncontato: Relacionamento com o lead (uuid public.leads)",
+        "tableId": "empresa",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "nome",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues0_Field_Value', `Nome da empresa`, 'string') }}"
+            },
+            {
+              "fieldId": "cidade",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues1_Field_Value', `Cidade da empresa`, 'string') }}"
+            },
+            {
+              "fieldId": "uf",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues2_Field_Value', `UF do Estado`, 'string') }}"
+            },
+            {
+              "fieldId": "cnpj",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues3_Field_Value', `nnúmero do CNPJ`, 'string') }}"
+            },
+            {
+              "fieldId": "site",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues4_Field_Value', `Site da empresa em formato de domínio válido`, 'string') }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues5_Field_Value', `Email da empresa no formato email válido`, 'string') }}"
+            },
+            {
+              "fieldId": "telefone",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues6_Field_Value', `Telefone da empresa no formato ddi, ddd, número. Exemplo: 5511945678945`, 'string') }}"
+            },
+            {
+              "fieldId": "contato",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues7_Field_Value', `Id do Lead em atendimento (Tabela Leads): uuid`, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        928
+      ],
+      "id": "ce086162-732c-47ec-a921-84e3fa2c8e24",
+      "name": "cria_empresa_db",
+      "credentials": {
+        "supabaseApi": {
+          "id": "oRO3WPWVgAHBgmrD",
+          "name": "Supabase Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "=Cria uma nova empresa no CRM Piperun;\n\nInputs obrigatórios:\n- name: Nome da empresa;\n- city_id: ID da cidade da empresa. Obtenha com a tool `get_city_id`;\n- cnpj: CNPJ da empresa. Formatos aceitos: \"XXXXXXXX0001XX\" e \"XX.XXX.XXX/0001-XX\";\n- website: URL do website da empresa;\n- email_nf: E-mail da empresa para envio de nota fiscal;",
+        "method": "POST",
+        "url": "https://api.pipe.run/v1/companies",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', `Nome da empresa`, 'string') }}"
+            },
+            {
+              "name": "city_id",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `ID da cidade da empresa.`, 'string') }}"
+            },
+            {
+              "name": "cnpj",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters2_Value', `CNPJ da empresa. Formatos aceitos: \"XXXXXXXX0001XX\" e \"XX.XXX.XXX/0001-XX\".`, 'string') }}"
+            },
+            {
+              "name": "website",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters3_Value', `URL válida do website da empresa. Formatos aceitos: \"www.site.com.br\", \"https://www.empresa.com\",\"empresa.com.br\" ou \"http://empresa.com\"\n`, 'string') }}"
+            },
+            {
+              "name": "email_nf",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters4_Value', `E-mail da empresa para envio de nota fiscal.`, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        1184,
+        784
+      ],
+      "id": "d8d4008d-3feb-4b61-8241-d4ce7fcb2cff",
+      "name": "cria_empresa_piperun",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "U2Tgnn6okQAdBOU4",
+          "name": "Piperun Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Busca o codigo da cidade via API para cadastrar no CRM Piperun.\nInputs obrigatorios:\nname: nome da cidade (string),\nuf: UF do estado, 2 caracteres (string)",
+        "url": "https://api.pipe.run/v1/cities",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "cursor",
+              "value": "\"\""
+            },
+            {
+              "name": "name",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `nome da cidade. Exemplo: \"Guarulhos\"`, 'string') }}"
+            },
+            {
+              "name": "uf",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters2_Value', `UF estado. Exemplo: \"SP\"`, 'string') }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "token",
+              "value": "<redacted>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        608,
+        784
+      ],
+      "id": "7a545584-d273-44b2-a27b-460c67360d5e",
+      "name": "get_city_id",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "U2Tgnn6okQAdBOU4",
+          "name": "Piperun Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "=Atualiza um registro de empresa específico cadastrado na conta do CRM PipeRun, informando o ID da empresa como path parameter.\n\nInput obrigatório para localizar a empresa:\nid: ID da empresa;\n\nDados possiveis de atualização:\nname: Nome da empresa,\ncity_id: Código da cidade. Obtenha usando a tool `get_city_id`,\ncnpj: CNPJ da empresa. Formatos aceitos: \"XXXXXXXX0001XX\" e \"XX.XXX.XXX/0001-XX\",\nwebsite: Site da empresa em URL válida,\nemail_nf: E-mail da empresa para envio de nota fiscal,",
+        "method": "PUT",
+        "url": "https://api.pipe.run/v1/companies/21605620",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', `Novo nome da empresa`, 'string') }}"
+            },
+            {
+              "name": "city_id",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `Novo código da cidade`, 'string') }}"
+            },
+            {
+              "name": "website",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters2_Value', `Novo site da empresa`, 'string') }}"
+            },
+            {
+              "name": "email_nf",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters3_Value', `Novo email`, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        1376,
+        784
+      ],
+      "id": "77102904-9d6c-4e63-b4c8-c66058eff11d",
+      "name": "atualiza_empresa_piperun",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "U2Tgnn6okQAdBOU4",
+          "name": "Piperun Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Cria uma nova oportunidade no CRM Piperun",
+        "method": "POST",
+        "url": "https://api.pipe.run/v1/deals",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "pipeline_id",
+              "value": "100848"
+            },
+            {
+              "name": "stage_id",
+              "value": "647558"
+            },
+            {
+              "name": "title",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters2_Value', `Titulo da oportunidade`, 'string') }}"
+            },
+            {
+              "name": "company_id",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters3_Value', `ID da empresa vinculada à oportunidade`, 'string') }}"
+            },
+            {
+              "name": "status",
+              "value": "0"
+            },
+            {
+              "name": "value",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters5_Value', `Valor de produtos e serviços (P&S) da oportunidade`, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        624,
+        1072
+      ],
+      "id": "89b2ad93-9804-4424-9d50-350728133f4d",
+      "name": "nova_oportunidade_piperun",
+      "notesInFlow": false,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "U2Tgnn6okQAdBOU4",
+          "name": "Piperun Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Recupera uma empresa no banco de dados através do CNPJ",
+        "url": "https://api.pipe.run/v1/companies",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "cursor",
+              "value": "\"\""
+            },
+            {
+              "name": "cnpj",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `CNPJ da empresa`, 'string') }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "token",
+              "value": "<redacted>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        1568,
+        784
+      ],
+      "id": "e1a4ca7a-73e3-4921-94f9-b035cce63c29",
+      "name": "get_empresa",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "U2Tgnn6okQAdBOU4",
+          "name": "Piperun Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## PipeRun",
+        "height": 640,
+        "width": 1312,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        528,
+        656
+      ],
+      "typeVersion": 1,
+      "id": "dc112752-3e6e-4092-a044-99d02d470e0c",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Adiciona um registro de pessoa na conta do CRM PipeRun.",
+        "method": "POST",
+        "url": "https://api.pipe.run/v1/persons",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('JSON', `{\n  \"contactEmails\": [\n    \"email 1\",\n    \"email 2\"\n  ],\n  \"contactPhones\": [\n    \"telefone 1\",\n    \"telefone 2\"\n  ],\n  \"name\": \"Nome da pessoa\",\n  \"city_id\": Id da cidade\n}`, 'json') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        784,
+        784
+      ],
+      "id": "86e67d8c-b2c9-4bb3-a14a-82580e3d34b0",
+      "name": "new_person_piperun",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "U2Tgnn6okQAdBOU4",
+          "name": "Piperun Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "=Cria uma nova nota vinculada a uma oportunidade;\n\nInputs obrigatórios:\ndeal_id: \"Id da oportunidade\", obtenha usando a tool `get_oportunidade`,\ntext: \"Texto da nota\"",
+        "method": "POST",
+        "url": "https://api.pipe.run/v1/notes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "deal_id",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', `ID da oportunidade`, 'string') }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `Conteúdo da nota. Texto.`, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        1184,
+        1088
+      ],
+      "id": "b2cc71b5-b610-4e27-ba26-4bf5d32cfc86",
+      "name": "nova_nota_oportunidade",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "U2Tgnn6okQAdBOU4",
+          "name": "Piperun Seleto"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "### Persons",
+        "height": 256,
+        "width": 528
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        720
+      ],
+      "typeVersion": 1,
+      "id": "9c4faa9f-076f-464a-bfc0-8c38a7526e67",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "### Empresa",
+        "height": 256,
+        "width": 688,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1120,
+        720
+      ],
+      "typeVersion": 1,
+      "id": "0105f643-78e9-4124-8e73-a57c7e95e646",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "### Oportunidade",
+        "height": 256,
+        "width": 528,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        1008
+      ],
+      "typeVersion": 1,
+      "id": "2776da93-5403-4ebb-a6f0-eda456523d8d",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "### Notas",
+        "height": 256,
+        "width": 688,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1120,
+        1008
+      ],
+      "typeVersion": 1,
+      "id": "1143312f-6bd8-48c1-bc04-088e7c465915",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Supabase",
+        "height": 640,
+        "width": 688,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -192,
+        656
+      ],
+      "typeVersion": 1,
+      "id": "74f17003-e398-47e6-a602-55db21f7ddb7",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Seleto",
+        "height": 640,
+        "width": 448,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1872,
+        656
+      ],
+      "typeVersion": 1,
+      "id": "00eee675-f4b1-447d-8d20-2cea7faebda6",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "=Recupera orçamento do lead no banco de dados;\n\nParametro de filtro:\nlead: UUID do lead em atendimento (string)\n\nResponse:\nRetorne apenas o 'oportunidade_pipe_id'\n",
+        "operation": "getAll",
+        "tableId": "orcamentos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead",
+              "condition": "eq",
+              "keyValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('conditions0_Field_Value', `UUID do lead em atendimento`, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        16,
+        1104
+      ],
+      "id": "603d3be4-c1dd-4b7c-8da3-2eb48fbe7b94",
+      "name": "get_oportunidade_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "oRO3WPWVgAHBgmrD",
+          "name": "Supabase Seleto"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "atualiza_nome": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "atualiza_lead_orcamento": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cria_orcamento": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "temperatura_lead": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cria_empresa_db": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cria_empresa_piperun": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_city_id": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "atualiza_empresa_piperun": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "nova_oportunidade_piperun": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_empresa": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "new_person_piperun": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "nova_nota_oportunidade": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_oportunidade_id": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "723c9a12-462d-40da-9669-7b5226eb2d62",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e964121fad52c348cb1359725f68d383e2fae65150113b30c3ab9403d111ded"
+  },
+  "id": "Xri9ntrB2ArMubB2",
+  "tags": []
+}

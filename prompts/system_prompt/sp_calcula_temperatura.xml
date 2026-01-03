@@ -1,0 +1,41 @@
+<calcula_temperatura>
+    <instrucoes>
+    Classifique a conversa do lead de acordo com os critérios abaixo, retornando a temperatura do lead: frio, morno ou quente.
+        <fluxo>
+            <item>Analise o resumo da conversa e os critérios para classificar a temperatura do lead em frio, morno ou quente</item>
+            <item>Use a tool `atualiza_lead_temperatura` para atualizar a temperatura do lead</item>
+        </fluxo>
+    </instrucoes>
+    <regra>
+        <item>Responda apenas com uma temperatura: frio, morno ou quente</item>
+        <item>Nunca responda mais de uma palavra</item>
+        <item>Responda com apenas uma palavra: frio, morno ou quente</item>
+    </regra>
+    <conversa>
+    {{ Aqui vai o resumo da conversa }}
+    </conversa>
+    <criterios>
+        <frio>
+            <item>O lead é frio se:</item>
+            <item>O lead não respondeu a nenhuma pergunta</item>
+            <item>O lead não respondeu a nenhuma pergunta</item>
+            <item>O lead não respondeu a nenhuma pergunta</item>
+        </frio>
+        <morno>
+            <item>O lead é morno se:</item>
+            <item>O lead respondeu a algumas perguntas</item>
+            <item>O lead respondeu a algumas perguntas</item>
+        </morno>
+        <quente>
+            <item>O lead é quente se:</item>
+            <item>O lead respondeu a todas as perguntas</item>
+            <item>O lead respondeu a todas as perguntas</item>
+        </quente>
+    </criterios>
+</calcula_temperatura>
+
+<tools>
+    <tool name="atualiza_lead_temperatura">
+        <description>Atualiza a temperatura do lead. Input: Temperatura do lead: (frio, morno ou quente) string</description>
+    </tool>
+</tools>
