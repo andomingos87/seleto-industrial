@@ -4,7 +4,11 @@
       "Bash(python -m ruff check:*)",
       "Bash(./venv/Scripts/python -m pytest tests/services/test_whatsapp.py::TestWhatsAppService::test_send_message_uses_client_token_header -v)",
       "Bash(./venv/Scripts/python -c \"from agno.models.openai import OpenAIChat; import inspect; print\\(inspect.signature\\(OpenAIChat.__init__\\)\\)\")",
-      "Bash(./venv/Scripts/python -m pytest tests/agents/test_sdr_agent.py -v)"
+      "Bash(./venv/Scripts/python -m pytest tests/agents/test_sdr_agent.py -v)",
+      "Bash(./venv/Scripts/python -m pytest tests/services/test_knowledge_base.py -v --tb=short)",
+      "Bash(./venv/Scripts/python -m pytest tests/agents/test_sdr_agent_knowledge.py -v --tb=short)",
+      "Bash(./venv/Scripts/python:*)",
+      "Bash(cd:*)"
     ]
   }
 }

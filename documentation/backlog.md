@@ -316,58 +316,106 @@
 - **Tipo**: User Story
 - **Descrição**: Como lead, quero tirar dúvidas sobre equipamentos da Seleto Industrial, para entender se atendem minha necessidade.
 - **Critérios de Aceitação**:
-  - [ ] Agente responde perguntas sobre formadoras, cortadoras, linhas automáticas
-  - [ ] Respostas baseadas nos arquivos de `prompts/equipamentos/*`
-  - [ ] Se dúvida for técnica demais, agente registra e informa que especialista entrará em contato
-  - [ ] Agente não promete prazos de entrega, descontos ou orçamento completo
-  - [ ] Agente não informa preços, condições comerciais ou descontos em nenhuma circunstância
+  - [x] Agente responde perguntas sobre formadoras, cortadoras, linhas automáticas
+  - [x] Respostas baseadas nos arquivos de `prompts/equipamentos/*`
+  - [x] Se dúvida for técnica demais, agente registra e informa que especialista entrará em contato
+  - [x] Agente não promete prazos de entrega, descontos ou orçamento completo
+  - [x] Agente não informa preços, condições comerciais ou descontos em nenhuma circunstância
 - **Dependências**: TECH-009
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-04)
+- **Artefatos**:
+  - `src/services/knowledge_base.py` - Serviço de base de conhecimento com guardrails
+  - `tests/services/test_knowledge_base.py` - 77 testes do serviço
+  - `tests/agents/test_sdr_agent_knowledge.py` - 11 testes de integração
 
 ---
 
-### US-004: Sugerir upsell de FBM100 para FB300
+### US-004: Sugerir upsell de FBM100 para FB300 ✅
 
 - **Tipo**: User Story
 - **Descrição**: Como agente, quando o lead demonstrar interesse na formadora manual FBM100, quero sugerir também a FB300 (semi-automática) como alternativa.
 - **Critérios de Aceitação**:
-  - [ ] Quando lead mencionar FBM100, agente apresenta FB300 como opção "acima"
-  - [ ] Tom consultivo, sem pressão
-  - [ ] Registro da sugestão no contexto da conversa
+  - [x] Quando lead mencionar FBM100, agente apresenta FB300 como opção "acima"
+  - [x] Tom consultivo, sem pressão
+  - [x] Registro da sugestão no contexto da conversa
 - **Dependências**: US-003
 - **Prioridade**: Média
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-04)
+- **Artefatos**:
+  - `src/services/upsell.py` - Serviço de detecção de interesse e sugestão de upsell
+  - `src/agents/sdr_agent.py` - Integração do upsell no fluxo de processamento (linhas 205-212)
+  - `tests/services/test_upsell.py` - 40 testes unitários do serviço
+  - `tests/agents/test_sdr_agent_upsell.py` - 11 testes de integração
+- **Validação**:
+  - ✅ Detecção de interesse em FBM100 via múltiplas keywords (FBM100, formadora manual, hambúrguer manual, etc.)
+  - ✅ Sugestão de FB300 injetada no contexto do agente com tom consultivo
+  - ✅ Comparativo de produtividade: FBM100 (500-600/dia) vs FB300 (300-350/hora)
+  - ✅ Controle para evitar sugestões repetidas (mesmo lead não recebe duas vezes)
+  - ✅ Registro de sugestões no contexto com timestamp e mensagem que disparou
+  - ✅ 51 testes passando (40 unitários + 11 integração)
 
 ---
 
-### US-005: Tratar interesse em produto indisponível (linha de espetos)
+### US-005: Tratar interesse em produto indisponível (linha de espetos) ✅
 
 - **Tipo**: User Story
 - **Descrição**: Como agente, quando o lead perguntar sobre máquina de espetos (indisponível), quero informar que está em melhoria e oferecer alternativa.
 - **Critérios de Aceitação**:
-  - [ ] Agente informa que projeto está em melhoria com previsão interna
-  - [ ] Agente registra interesse para contato futuro
-  - [ ] Agente oferece CT200 (corte em cubos) como alternativa quando fizer sentido
+  - [x] Agente informa que projeto está em melhoria com previsão interna
+  - [x] Agente registra interesse para contato futuro
+  - [x] Agente oferece CT200 (corte em cubos) como alternativa quando fizer sentido
 - **Dependências**: US-003
 - **Prioridade**: Baixa
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-04)
+- **Artefatos**:
+  - `src/services/unavailable_products.py` - Serviço de detecção de interesse e tratamento de produtos indisponíveis
+  - `src/agents/sdr_agent.py` - Integração do tratamento de produtos indisponíveis no fluxo de processamento (linhas 215-222)
+  - `tests/services/test_unavailable_products.py` - 47 testes unitários do serviço
+  - `tests/agents/test_sdr_agent_unavailable.py` - 15 testes de integração
+- **Validação**:
+  - ✅ Detecção de interesse em linha de espetos via múltiplas keywords (espeto, espetos, espetinho, espetar, máquina de espeto, etc.)
+  - ✅ Mensagem sobre indisponibilidade injetada no contexto do agente com tom profissional e empático
+  - ✅ Registro de interesse para contato futuro (ProductInterest dataclass com phone, product, timestamp, context)
+  - ✅ Sugestão condicional de CT200 quando lead menciona contexto de corte (cubo, tira, cortar, preparar carne)
+  - ✅ Instrução para agente NÃO mencionar data de previsão (março/2026) - informação apenas interna
+  - ✅ 62 testes passando (47 unitários + 15 integração)
+  - ✅ Integração com base de conhecimento e guardrails existentes funcional
 
 ---
 
-### TECH-008: Implementar memória/histórico de conversa por lead
+### TECH-008: Implementar memória/histórico de conversa por lead ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Manter histórico de mensagens e contexto coletado por telefone do lead, para continuidade da conversa.
 - **Critérios de Aceitação**:
-  - [ ] Histórico completo de mensagens persistido no Supabase (DB) para auditoria, análise e backup
-  - [ ] Histórico também replicado no Chatwoot para interface visual e acompanhamento humano em tempo real
-  - [ ] Contexto coletado (nome, cidade, produto, etc.) persistido e recuperável
-  - [ ] Lead identificado por telefone (idempotência)
-  - [ ] Histórico disponível para consulta do agente em cada turno
+  - [x] Histórico completo de mensagens persistido no Supabase (DB) para auditoria, análise e backup
+  - [x] Histórico também replicado no Chatwoot para interface visual e acompanhamento humano em tempo real
+  - [x] Contexto coletado (nome, cidade, produto, etc.) persistido e recuperável
+  - [x] Lead identificado por telefone (idempotência)
+  - [x] Histórico disponível para consulta do agente em cada turno
 - **Dependências**: TECH-002
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-XX
+- **Artefatos**:
+  - `src/services/conversation_persistence.py` - Serviço de persistência no Supabase
+  - `src/services/chatwoot_sync.py` - Serviço de sincronização com Chatwoot
+  - Modificações em `src/services/conversation_memory.py` - Integração com persistência Supabase e Chatwoot
+  - Modificações em `src/services/lead_persistence.py` - Integração com contexto persistido
+  - Migrations SQL para Supabase: `create_conversation_messages_table`, `create_conversation_context_table`
+  - Testes: `tests/services/test_conversation_persistence.py`, `tests/services/test_chatwoot_sync.py`, `tests/agents/test_sdr_agent_history.py`
+- **Validação**:
+  - ✅ Tabelas `conversation_messages` e `conversation_context` criadas no Supabase com RLS ativado
+  - ✅ Mensagens são persistidas automaticamente no Supabase quando adicionadas ao histórico
+  - ✅ Mensagens são sincronizadas com Chatwoot de forma assíncrona (não bloqueia resposta)
+  - ✅ Contexto coletado é persistido e recuperado do Supabase
+  - ✅ Histórico é carregado automaticamente do Supabase quando necessário (cache em memória)
+  - ✅ Lead identificado por telefone normalizado (idempotência garantida)
+  - ✅ Histórico disponível para o agente em cada turno através de `conversation_memory.get_messages_for_llm()`
 
 ---
 
@@ -376,12 +424,17 @@
 - **Tipo**: Technical Story
 - **Descrição**: Carregar e indexar arquivos de `prompts/equipamentos/*` para uso pelo agente nas respostas.
 - **Critérios de Aceitação**:
-  - [ ] Arquivos de equipamentos carregados no startup do agente
-  - [ ] Busca semântica ou por palavras-chave funcional
-  - [ ] Atualização da base requer apenas substituição de arquivos + restart
+  - [x] Arquivos de equipamentos carregados no startup do agente
+  - [x] Busca semântica ou por palavras-chave funcional
+  - [x] Atualização da base requer apenas substituição de arquivos + restart
 - **Dependências**: TECH-001
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-04)
+- **Artefatos**:
+  - `src/services/knowledge_base.py` - Classe `KnowledgeBase` com métodos `load_equipment_files()` e `search_knowledge_base()`
+  - Cache em memória implementado (singleton pattern)
+  - Busca por palavras-chave funcional para formadoras, cortadoras, ensacadeiras, misturadores e linhas automáticas
 
 ---
 

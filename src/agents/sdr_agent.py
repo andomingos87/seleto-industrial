@@ -2,7 +2,7 @@
 SDR Agent - Conversational agent for lead qualification.
 
 This module implements the main agent logic with system prompt loading,
-conversation memory, and response generation.
+conversation memory, response generation, and knowledge base integration (US-003).
 """
 
 import asyncio
@@ -15,6 +15,14 @@ from agno.models.openai import OpenAIChat
 from src.config.settings import settings
 from src.services.conversation_memory import conversation_memory
 from src.services.data_extraction import extract_lead_data
+from src.services.knowledge_base import (
+    get_knowledge_base,
+    is_commercial_query,
+    is_too_technical,
+    register_technical_question,
+)
+from src.services.unavailable_products import get_espeto_context_for_agent
+from src.services.upsell import get_upsell_context_for_agent
 from src.services.lead_persistence import get_persisted_lead_data, persist_lead_data
 from src.services.prompt_loader import get_system_prompt_path, load_system_prompt_from_xml
 from src.utils.logging import get_logger, set_phone
@@ -142,8 +150,76 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
     # Get question count to enforce rate limit (US-002: máximo 2 perguntas diretas)
     question_count = conversation_memory.get_question_count(normalized_phone)
 
+    # US-003: Apply knowledge base guardrails
+    kb = get_knowledge_base()
+
+    # Check for commercial query (guardrail: no prices/discounts/delivery)
+    if is_commercial_query(message):
+        logger.info(
+            "Commercial query detected - applying guardrail",
+            extra={"phone": normalized_phone, "message_preview": message[:50]},
+        )
+        commercial_response = kb.get_commercial_response()
+
+        # Add messages to history
+        conversation_memory.add_message(normalized_phone, "user", message)
+        conversation_memory.add_message(normalized_phone, "assistant", commercial_response)
+
+        return commercial_response
+
+    # Check for overly technical query (escalate to human specialist)
+    if is_too_technical(message):
+        logger.info(
+            "Technical query detected - registering for specialist follow-up",
+            extra={"phone": normalized_phone, "message_preview": message[:50]},
+        )
+        # Register the question for follow-up
+        register_technical_question(
+            phone=normalized_phone,
+            question=message,
+            context=f"Lead data: {lead_data}" if lead_data else None,
+        )
+        technical_response = kb.get_technical_escalation_response()
+
+        # Add messages to history
+        conversation_memory.add_message(normalized_phone, "user", message)
+        conversation_memory.add_message(normalized_phone, "assistant", technical_response)
+
+        return technical_response
+
     # Build context message for the agent
     context_parts = []
+
+    # US-003: Add knowledge base context if query is about equipment
+    if kb.is_equipment_query(message):
+        response_type, knowledge_content = kb.get_equipment_response(message)
+        if response_type == "knowledge" and knowledge_content:
+            context_parts.append("\n=== BASE DE CONHECIMENTO - EQUIPAMENTOS ===")
+            context_parts.append("Use as informações abaixo para responder sobre equipamentos:")
+            context_parts.append(knowledge_content)
+            context_parts.append("\n⚠️ IMPORTANTE: NÃO informe preços, descontos ou prazos de entrega.")
+            logger.debug(
+                "Knowledge base context injected",
+                extra={"phone": normalized_phone, "knowledge_size": len(knowledge_content)},
+            )
+
+    # US-004: Check for upsell opportunity (FBM100 -> FB300)
+    upsell_context = get_upsell_context_for_agent(normalized_phone, message)
+    if upsell_context:
+        context_parts.append(upsell_context)
+        logger.info(
+            "Upsell context injected (FBM100 -> FB300)",
+            extra={"phone": normalized_phone},
+        )
+
+    # US-005: Check for interest in unavailable products (espeto line)
+    espeto_context = get_espeto_context_for_agent(normalized_phone, message)
+    if espeto_context:
+        context_parts.append(espeto_context)
+        logger.info(
+            "Espeto unavailable product context injected",
+            extra={"phone": normalized_phone},
+        )
 
     # Add lead data context if available
     if lead_data:

@@ -2,12 +2,11 @@
 Lead persistence service for saving and retrieving lead data.
 
 This service provides a unified interface for persisting lead data,
-with support for Supabase (when available) and in-memory fallback.
+with support for Supabase (TECH-008) and in-memory fallback.
 """
 
 from typing import Dict, Optional
 
-from src.config.settings import settings
 from src.services.conversation_memory import conversation_memory
 from src.utils.logging import get_logger
 from src.utils.validation import normalize_phone
@@ -20,8 +19,8 @@ async def persist_lead_data(phone: str, data: Dict[str, Optional[str]]) -> bool:
     Persist lead data (partial or complete) to storage.
 
     This function:
-    1. Updates in-memory conversation memory
-    2. Attempts to persist to Supabase if configured (future: TECH-012)
+    1. Updates in-memory conversation memory (which persists to Supabase - TECH-008)
+    2. Context is also persisted to conversation_context table
     3. Logs the operation
 
     Args:
@@ -37,19 +36,8 @@ async def persist_lead_data(phone: str, data: Dict[str, Optional[str]]) -> bool:
         return False
 
     try:
-        # Update in-memory conversation memory
+        # Update in-memory conversation memory (this also persists to Supabase via update_lead_data)
         conversation_memory.update_lead_data(normalized_phone, data)
-
-        # TODO: When TECH-012 is implemented, add Supabase persistence here
-        # For now, we only use in-memory storage
-        # This ensures data is available even if conversation is not completed
-        if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
-            # Future: Implement Supabase upsert
-            # await upsert_lead_to_supabase(normalized_phone, data)
-            logger.debug(
-                "Supabase configured but persistence not yet implemented (TECH-012)",
-                extra={"phone": normalized_phone},
-            )
 
         logger.info(
             "Lead data persisted",
@@ -77,6 +65,8 @@ def get_persisted_lead_data(phone: str) -> Dict[str, Optional[str]]:
     """
     Get persisted lead data for a phone number.
 
+    Gets from conversation memory, which loads from Supabase if needed (TECH-008).
+
     Args:
         phone: Phone number (will be normalized)
 
@@ -87,15 +77,8 @@ def get_persisted_lead_data(phone: str) -> Dict[str, Optional[str]]:
     if not normalized_phone:
         return {}
 
-    # Get from conversation memory (in-memory)
+    # Get from conversation memory (loads from Supabase if not cached)
     lead_data = conversation_memory.get_lead_data(normalized_phone)
-
-    # TODO: When TECH-012 is implemented, also check Supabase
-    # if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
-    #     supabase_data = get_lead_from_supabase(normalized_phone)
-    #     if supabase_data:
-    #         # Merge with in-memory data (in-memory takes precedence for current session)
-    #         lead_data = {**supabase_data, **lead_data}
 
     return lead_data
 
