@@ -163,6 +163,26 @@ Para rotacionar credenciais sem redeploy:
 2. O serviço carregará automaticamente no próximo request (para integrações que suportam)
 3. Para credenciais críticas (Supabase, OpenAI), um restart pode ser necessário
 
+## Troubleshooting
+
+### Erro: "OPENAI_API_KEY not set" ou "OPENAI_API_KEY not configured"
+
+**Sintoma**: Logs mostram erro de autenticação da OpenAI mesmo com `.env` configurado.
+
+**Causa**: A variável `OPENAI_API_KEY` não está configurada corretamente no arquivo `.env`.
+
+**Soluções**:
+1. Verificar se `.env` está na raiz do projeto
+2. Verificar se a variável está escrita corretamente: `OPENAI_API_KEY=sk-...`
+3. Verificar se não há espaços extras: `OPENAI_API_KEY = sk-...` (incorreto)
+4. Reiniciar o servidor após modificar `.env`
+5. Verificar carregamento:
+   ```bash
+   python -c "from src.config.settings import settings; print('API Key configured:', bool(settings.OPENAI_API_KEY))"
+   ```
+
+**Nota técnica**: O sistema passa a API key explicitamente para o modelo OpenAI, não dependendo de `os.environ`. As variáveis do `.env` são carregadas via Pydantic Settings.
+
 ## Licença
 
 Proprietário - Seleto Industrial

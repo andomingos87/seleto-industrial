@@ -46,12 +46,32 @@ def create_sdr_agent() -> Agent:
 
     Returns:
         Configured Agent instance
+
+    Raises:
+        ValueError: If OPENAI_API_KEY is not configured
     """
+    # Validate API key before creating model (TECH-035)
+    if not settings.OPENAI_API_KEY:
+        error_msg = (
+            "OPENAI_API_KEY not configured. "
+            "Please set OPENAI_API_KEY in .env file or environment variables."
+        )
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    logger.info(
+        "OpenAI API key configured",
+        extra={"model": settings.OPENAI_MODEL, "key_length": len(settings.OPENAI_API_KEY)},
+    )
+
     system_prompt = _load_system_prompt()
 
     agent = Agent(
         name="Seleto SDR",
-        model=OpenAIChat(id=settings.OPENAI_MODEL),
+        model=OpenAIChat(
+            id=settings.OPENAI_MODEL,
+            api_key=settings.OPENAI_API_KEY,  # Pass API key explicitly (TECH-035)
+        ),
         description="Agente de qualificação de leads para Seleto Industrial",
         instructions=[system_prompt],
         markdown=True,
