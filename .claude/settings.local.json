@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m ruff check:*)",
+      "Bash(./venv/Scripts/python -m pytest tests/services/test_whatsapp.py::TestWhatsAppService::test_send_message_uses_client_token_header -v)"
+    ]
+  }
+}

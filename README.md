@@ -130,12 +130,19 @@ Consulte o arquivo `.env.example` para todas as variáveis disponíveis.
 | `PIPERUN_PIPELINE_ID` | ID do pipeline de vendas | MVP |
 | `PIPERUN_STAGE_ID` | ID do estágio inicial | MVP |
 | `PIPERUN_ORIGIN_ID` | ID da origem do lead | MVP |
-| `WHATSAPP_API_URL` | URL da API do provedor WhatsApp | MVP |
-| `WHATSAPP_API_TOKEN` | Token de autenticação WhatsApp | MVP |
-| `WHATSAPP_WEBHOOK_SECRET` | Secret para validar webhooks | MVP |
+| `ZAPI_INSTANCE_ID` | ID da instância Z-API | MVP |
+| `ZAPI_INSTANCE_TOKEN` | Token da instância Z-API | MVP |
+| `ZAPI_CLIENT_TOKEN` | Token de conta Z-API (Client-Token header) | MVP |
 | `CHATWOOT_API_URL` | URL da instância Chatwoot | MVP |
 | `CHATWOOT_API_TOKEN` | Token da API Chatwoot | MVP |
 | `CHATWOOT_ACCOUNT_ID` | ID da conta no Chatwoot | MVP |
+
+**Nota sobre Z-API**: O projeto usa Z-API como provedor de WhatsApp. Se as variáveis Z-API não estiverem configuradas, o sistema processará mensagens mas não enviará respostas (modo desenvolvimento).
+
+**Nota sobre segurança de webhooks**: Z-API não permite configurar headers customizados nos webhooks. A segurança é garantida por:
+- HTTPS obrigatório (requerido pela Z-API)
+- Validação de formato de payload
+- Logs de todas as requisições recebidas
 
 #### Variáveis de Configuração
 

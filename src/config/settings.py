@@ -40,10 +40,16 @@ class Settings(BaseSettings):
     PIPERUN_STAGE_ID: int | None = None
     PIPERUN_ORIGIN_ID: int | None = None
 
-    # WhatsApp Provider
+    # Z-API Configuration (WhatsApp Provider)
+    ZAPI_INSTANCE_ID: str | None = None
+    ZAPI_INSTANCE_TOKEN: str | None = None
+    ZAPI_CLIENT_TOKEN: str | None = None
+    # Note: Z-API does not support custom webhook authentication headers
+    # Security relies on HTTPS (required) and payload validation
+
+    # Legacy WhatsApp variables (deprecated, use Z-API variables above)
     WHATSAPP_API_URL: str | None = None
     WHATSAPP_API_TOKEN: str | None = None
-    WHATSAPP_WEBHOOK_SECRET: str | None = None
 
     # Chatwoot
     CHATWOOT_API_URL: str | None = None

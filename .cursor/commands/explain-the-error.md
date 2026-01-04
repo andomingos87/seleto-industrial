@@ -1,0 +1,1 @@
+Explique o erro e me responda aqui no chat, não altere o projeto e nem  gere e/ou execute nada.

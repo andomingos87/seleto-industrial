@@ -6,13 +6,12 @@ import asyncio
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from src.agents.sdr_agent import process_message
-from src.config.settings import settings
 from src.services.transcription import transcribe_audio
-from src.services.whatsapp import send_whatsapp_message
+from src.services.whatsapp import send_whatsapp_message, whatsapp_service
 from src.utils.logging import (
     get_logger,
     log_webhook_received,
@@ -61,48 +60,6 @@ class WhatsAppWebhookPayload(BaseModel):
     )
 
 
-def validate_webhook_auth(
-    authorization: Optional[str] = Header(None),
-    x_webhook_secret: Optional[str] = Header(None),
-) -> bool:
-    """
-    Validate webhook authentication token/secret.
-
-    Args:
-        authorization: Authorization header (Bearer token)
-        x_webhook_secret: X-Webhook-Secret header
-
-    Returns:
-        True if authentication is valid, False otherwise
-
-    Raises:
-        HTTPException: If authentication fails
-    """
-    webhook_secret = settings.WHATSAPP_WEBHOOK_SECRET
-
-    # If no secret is configured, skip validation (development mode)
-    if not webhook_secret:
-        logger.warning("WhatsApp webhook secret not configured, skipping validation")
-        return True
-
-    # Check X-Webhook-Secret header first (common pattern)
-    if x_webhook_secret and x_webhook_secret == webhook_secret:
-        return True
-
-    # Check Authorization header (Bearer token)
-    if authorization:
-        if authorization.startswith("Bearer "):
-            token = authorization[7:]
-            if token == webhook_secret:
-                return True
-
-    # Authentication failed
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid webhook authentication",
-    )
-
-
 async def process_text_message(payload: WhatsAppWebhookPayload) -> dict:
     """
     Process incoming text message.
@@ -141,13 +98,22 @@ async def process_text_message(payload: WhatsAppWebhookPayload) -> dict:
             sender_name=payload.senderName,
         )
 
-        # Send response via WhatsApp
+        # Send response via Z-API
         if response_text:
-            success = await send_whatsapp_message(normalized_phone, response_text)
-            if not success:
-                logger.error(
-                    "Failed to send WhatsApp response",
-                    extra={"phone": normalized_phone},
+            if whatsapp_service.is_configured():
+                success = await send_whatsapp_message(normalized_phone, response_text)
+                if not success:
+                    logger.error(
+                        "Failed to send Z-API response",
+                        extra={"phone": normalized_phone},
+                    )
+            else:
+                logger.warning(
+                    "Z-API not configured, response generated but not sent",
+                    extra={
+                        "phone": normalized_phone,
+                        "response_length": len(response_text),
+                    },
                 )
         else:
             logger.warning(
@@ -164,12 +130,27 @@ async def process_text_message(payload: WhatsAppWebhookPayload) -> dict:
             },
             exc_info=True,
         )
-        # Send fallback message
+        # Send fallback message only if Z-API is configured
         fallback_message = (
             "Olá! Seja bem-vindo à Seleto Industrial 👋\n"
             "Desculpe, tive um problema técnico. Pode repetir sua mensagem?"
         )
-        await send_whatsapp_message(normalized_phone, fallback_message)
+        if whatsapp_service.is_configured():
+            try:
+                await send_whatsapp_message(normalized_phone, fallback_message)
+            except Exception as fallback_error:
+                logger.error(
+                    "Failed to send fallback message",
+                    extra={
+                        "phone": normalized_phone,
+                        "error": str(fallback_error),
+                    },
+                )
+        else:
+            logger.warning(
+                "Z-API not configured, fallback message not sent",
+                extra={"phone": normalized_phone},
+            )
 
     return {
         "status": "processed",
@@ -275,13 +256,22 @@ async def process_audio_message(payload: WhatsAppWebhookPayload) -> dict:
             sender_name=payload.senderName,
         )
 
-        # Send response via WhatsApp
+        # Send response via Z-API
         if response_text:
-            success = await send_whatsapp_message(normalized_phone, response_text)
-            if not success:
-                logger.error(
-                    "Failed to send WhatsApp response",
-                    extra={"phone": normalized_phone},
+            if whatsapp_service.is_configured():
+                success = await send_whatsapp_message(normalized_phone, response_text)
+                if not success:
+                    logger.error(
+                        "Failed to send Z-API response",
+                        extra={"phone": normalized_phone},
+                    )
+            else:
+                logger.warning(
+                    "Z-API not configured, response generated but not sent",
+                    extra={
+                        "phone": normalized_phone,
+                        "response_length": len(response_text),
+                    },
                 )
         else:
             logger.warning(
@@ -298,12 +288,27 @@ async def process_audio_message(payload: WhatsAppWebhookPayload) -> dict:
             },
             exc_info=True,
         )
-        # Send fallback message
+        # Send fallback message only if Z-API is configured
         fallback_message = (
             "Olá! Seja bem-vindo à Seleto Industrial 👋\n"
             "Desculpe, tive um problema técnico. Pode repetir sua mensagem?"
         )
-        await send_whatsapp_message(normalized_phone, fallback_message)
+        if whatsapp_service.is_configured():
+            try:
+                await send_whatsapp_message(normalized_phone, fallback_message)
+            except Exception as fallback_error:
+                logger.error(
+                    "Failed to send fallback message",
+                    extra={
+                        "phone": normalized_phone,
+                        "error": str(fallback_error),
+                    },
+                )
+        else:
+            logger.warning(
+                "Z-API not configured, fallback message not sent",
+                extra={"phone": normalized_phone},
+            )
 
     return {
         "status": "processed",
@@ -317,26 +322,25 @@ async def process_audio_message(payload: WhatsAppWebhookPayload) -> dict:
 @router.post("/webhook/whatsapp")
 async def whatsapp_webhook(
     request: Request,
-    authorization: Optional[str] = Header(None),
-    x_webhook_secret: Optional[str] = Header(None),
 ) -> Response:
     """
-    Receive webhook from WhatsApp provider.
+    Receive webhook from Z-API (WhatsApp provider).
 
     Supports both text and audio messages.
 
+    Security Note: Z-API does not support custom authentication headers.
+    We rely on:
+    - HTTPS (required by Z-API)
+    - Payload validation
+    - Request logging for audit
+
     Args:
         request: FastAPI request object
-        authorization: Authorization header (Bearer token)
-        x_webhook_secret: X-Webhook-Secret header
 
     Returns:
         HTTP 200 response (processing happens asynchronously)
     """
     start_time = time.perf_counter()
-
-    # Validate authentication
-    validate_webhook_auth(authorization, x_webhook_secret)
 
     # Read body from state (set by middleware) or directly
     import json

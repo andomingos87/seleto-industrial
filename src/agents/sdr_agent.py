@@ -149,23 +149,26 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
     try:
         # Use the agent's run method
         # For Agno, we use run() which handles the conversation
-        # We'll use the phone as a session identifier
+        # The run() method expects 'input' as the first positional argument
+        # We'll use the phone as a session identifier via thread_id if supported
         # Note: run() may be synchronous, so we run it in a thread pool
-        # Note: Agno may handle thread_id differently, so we'll pass it if supported
         try:
             response = await asyncio.to_thread(
                 sdr_agent.run,
-                message=full_message,
+                full_message,  # input as positional argument
                 stream=False,
                 thread_id=normalized_phone,  # Use phone as thread ID for conversation continuity
             )
-        except TypeError:
+        except TypeError as e:
             # If thread_id is not supported, use run without it
-            response = await asyncio.to_thread(
-                sdr_agent.run,
-                message=full_message,
-                stream=False,
-            )
+            if "thread_id" in str(e) or "unexpected keyword" in str(e):
+                response = await asyncio.to_thread(
+                    sdr_agent.run,
+                    full_message,  # input as positional argument
+                    stream=False,
+                )
+            else:
+                raise
 
         # Extract response text
         response_text = ""

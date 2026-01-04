@@ -15,13 +15,25 @@ logger = get_logger(__name__)
 
 
 class WhatsAppService:
-    """Service for WhatsApp API interactions."""
+    """Service for Z-API (WhatsApp) interactions."""
 
     def __init__(self):
-        """Initialize WhatsApp service with API configuration."""
-        self.api_url = settings.WHATSAPP_API_URL
-        self.api_token = settings.WHATSAPP_API_TOKEN
+        """Initialize WhatsApp service with Z-API configuration."""
+        self.instance_id = settings.ZAPI_INSTANCE_ID
+        self.instance_token = settings.ZAPI_INSTANCE_TOKEN
+        self.client_token = settings.ZAPI_CLIENT_TOKEN
+        
+        # Construct Z-API URL dynamically
+        if self.instance_id and self.instance_token:
+            self.api_url = f"https://api.z-api.io/instances/{self.instance_id}/token/{self.instance_token}"
+        else:
+            self.api_url = None
+        
         self.timeout = httpx.Timeout(10.0, connect=5.0)
+
+    def is_configured(self) -> bool:
+        """Check if Z-API service is properly configured."""
+        return bool(self.instance_id and self.instance_token and self.client_token)
 
     async def send_message(
         self,
@@ -43,11 +55,18 @@ class WhatsAppService:
             True if message was sent successfully, False otherwise
 
         Raises:
-            ValueError: If WhatsApp API URL or token is not configured
+            ValueError: If Z-API is not configured
         """
-        if not self.api_url or not self.api_token:
+        if not self.is_configured():
+            missing = []
+            if not self.instance_id:
+                missing.append("ZAPI_INSTANCE_ID")
+            if not self.instance_token:
+                missing.append("ZAPI_INSTANCE_TOKEN")
+            if not self.client_token:
+                missing.append("ZAPI_CLIENT_TOKEN")
             raise ValueError(
-                "WhatsApp API URL and token must be configured via environment variables"
+                f"Z-API service not configured. Missing: {', '.join(missing)}"
             )
 
         normalized_phone = normalize_phone(phone)
@@ -58,8 +77,9 @@ class WhatsAppService:
         # Set phone in context for logging
         set_phone(normalized_phone)
 
+        # Z-API uses Client-Token header instead of Authorization Bearer
         headers = {
-            "Authorization": f"Bearer {self.api_token}",
+            "Client-Token": self.client_token,
             "Content-Type": "application/json",
         }
 
@@ -74,8 +94,9 @@ class WhatsAppService:
             try:
                 start_time = time.perf_counter()
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    # Z-API endpoint for sending text messages
                     response = await client.post(
-                        f"{self.api_url}/messages",
+                        f"{self.api_url}/send-text",
                         json=payload,
                         headers=headers,
                     )
@@ -102,9 +123,9 @@ class WhatsAppService:
                     # Log API call
                     log_api_call(
                         logger,
-                        service="whatsapp",
+                        service="z-api",
                         method="POST",
-                        endpoint="/messages",
+                        endpoint="/send-text",
                         status_code=response.status_code,
                         duration_ms=duration_ms,
                     )
@@ -112,7 +133,7 @@ class WhatsAppService:
                     # Success
                     if response.status_code in (200, 201):
                         logger.info(
-                            f"WhatsApp message sent successfully",
+                            "Z-API message sent successfully",
                             extra={
                                 "phone": normalized_phone,
                                 "status_code": response.status_code,
@@ -131,7 +152,7 @@ class WhatsAppService:
                             pass
 
                         logger.error(
-                            f"WhatsApp message send failed: {error_msg}",
+                            f"Z-API message send failed: {error_msg}",
                             extra={
                                 "phone": normalized_phone,
                                 "status_code": response.status_code,
@@ -160,7 +181,7 @@ class WhatsAppService:
                 if attempt < max_retries - 1:
                     backoff = initial_backoff * (2**attempt)
                     logger.warning(
-                        f"Timeout sending WhatsApp message, retrying in {backoff}s",
+                        f"Timeout sending Z-API message, retrying in {backoff}s",
                         extra={
                             "phone": normalized_phone,
                             "attempt": attempt + 1,
@@ -175,7 +196,7 @@ class WhatsAppService:
                 if attempt < max_retries - 1:
                     backoff = initial_backoff * (2**attempt)
                     logger.warning(
-                        f"Request error sending WhatsApp message, retrying in {backoff}s",
+                        f"Request error sending Z-API message, retrying in {backoff}s",
                         extra={
                             "phone": normalized_phone,
                             "attempt": attempt + 1,
@@ -189,7 +210,7 @@ class WhatsAppService:
             except Exception as e:
                 last_error = e
                 logger.error(
-                    f"Unexpected error sending WhatsApp message",
+                    "Unexpected error sending Z-API message",
                     extra={
                         "phone": normalized_phone,
                         "attempt": attempt + 1,
@@ -204,7 +225,7 @@ class WhatsAppService:
 
         # All retries exhausted
         logger.error(
-            f"WhatsApp message send failed after {max_retries} attempts",
+            f"Z-API message send failed after {max_retries} attempts",
             extra={
                 "phone": normalized_phone,
                 "max_retries": max_retries,
