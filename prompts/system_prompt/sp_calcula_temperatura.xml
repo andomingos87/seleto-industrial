@@ -1,41 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <calcula_temperatura>
     <instrucoes>
-    Classifique a conversa do lead de acordo com os critérios abaixo, retornando a temperatura do lead: frio, morno ou quente.
+        <descricao>
+            Classifique o lead em uma das tres temperaturas (frio, morno ou quente) com base
+            nos criterios de engajamento, completude dos dados, volume e urgencia de compra.
+        </descricao>
         <fluxo>
-            <item>Analise o resumo da conversa e os critérios para classificar a temperatura do lead em frio, morno ou quente</item>
-            <item>Use a tool `atualiza_lead_temperatura` para atualizar a temperatura do lead</item>
+            <item>Analise os dados coletados do lead e as metricas de engajamento</item>
+            <item>Avalie a completude das informacoes (nome, empresa, cidade, produto, volume)</item>
+            <item>Considere o nivel de urgencia manifestado pelo lead</item>
+            <item>Verifique se o volume solicitado e significativo para o negocio</item>
+            <item>Classifique o lead como frio, morno ou quente</item>
+            <item>Forneca uma breve justificativa para a classificacao</item>
         </fluxo>
     </instrucoes>
-    <regra>
-        <item>Responda apenas com uma temperatura: frio, morno ou quente</item>
-        <item>Nunca responda mais de uma palavra</item>
-        <item>Responda com apenas uma palavra: frio, morno ou quente</item>
-    </regra>
-    <conversa>
-    {{ Aqui vai o resumo da conversa }}
-    </conversa>
+
+    <regras>
+        <item>Responda com a classificacao (frio, morno ou quente) seguida de uma breve justificativa</item>
+        <item>A justificativa deve ter no maximo 2 frases</item>
+        <item>Considere todos os criterios antes de classificar</item>
+        <item>Em caso de duvida entre duas temperaturas, escolha a mais conservadora (mais fria)</item>
+    </regras>
+
     <criterios>
         <frio>
-            <item>O lead é frio se:</item>
-            <item>O lead não respondeu a nenhuma pergunta</item>
-            <item>O lead não respondeu a nenhuma pergunta</item>
-            <item>O lead não respondeu a nenhuma pergunta</item>
+            <descricao>Lead com baixo potencial de conversao no curto prazo</descricao>
+            <item>Score de engajamento abaixo de 30%</item>
+            <item>Dados incompletos: nome ou empresa nao informados</item>
+            <item>Sem interesse claro em produtos especificos</item>
+            <item>Sem urgencia de compra ou sem prazo definido</item>
+            <item>Volume nao informado ou muito pequeno</item>
+            <item>Apenas perguntas genericas sem intencao de compra</item>
+            <item>Nao conhece a Seleto Industrial</item>
         </frio>
+
         <morno>
-            <item>O lead é morno se:</item>
-            <item>O lead respondeu a algumas perguntas</item>
-            <item>O lead respondeu a algumas perguntas</item>
+            <descricao>Lead com potencial moderado, requer nurturing</descricao>
+            <item>Score de engajamento entre 30% e 60%</item>
+            <item>Dados parcialmente completos: nome e empresa informados</item>
+            <item>Interesse em produtos mas sem definicao clara</item>
+            <item>Urgencia baixa ou media</item>
+            <item>Volume estimado mas nao confirmado</item>
+            <item>Fazendo pesquisa de mercado ou orcamentos</item>
+            <item>Pode ja conhecer a Seleto ou ter ouvido falar</item>
         </morno>
+
         <quente>
-            <item>O lead é quente se:</item>
-            <item>O lead respondeu a todas as perguntas</item>
-            <item>O lead respondeu a todas as perguntas</item>
+            <descricao>Lead com alto potencial de conversao, pronto para proposta</descricao>
+            <item>Score de engajamento acima de 60%</item>
+            <item>Dados completos: nome, empresa, cidade, produto e volume informados</item>
+            <item>Interesse claro em produtos especificos da Seleto</item>
+            <item>Urgencia alta de compra</item>
+            <item>Volume significativo (ex: mais de 100 unidades ou projeto grande)</item>
+            <item>Ja conhece a Seleto ou ja comprou anteriormente</item>
+            <item>Solicitou proposta comercial ou visita tecnica</item>
+            <item>Decisor ou influenciador de compra</item>
         </quente>
     </criterios>
-</calcula_temperatura>
 
-<tools>
-    <tool name="atualiza_lead_temperatura">
-        <description>Atualiza a temperatura do lead. Input: Temperatura do lead: (frio, morno ou quente) string</description>
-    </tool>
-</tools>
+    <exemplos>
+        <exemplo temperatura="frio">
+            <dados>
+                <nome>Nao informado</nome>
+                <empresa>Nao informado</empresa>
+                <produto>Fritadeira (generico)</produto>
+                <volume>Nao informado</volume>
+                <urgencia>Nao informado</urgencia>
+                <engajamento>15%</engajamento>
+            </dados>
+            <classificacao>frio - Lead apenas fez pergunta generica sobre fritadeira, sem informar dados de contato ou volume de interesse.</classificacao>
+        </exemplo>
+
+        <exemplo temperatura="morno">
+            <dados>
+                <nome>Carlos</nome>
+                <empresa>Restaurante Bom Sabor</empresa>
+                <cidade>Sao Paulo</cidade>
+                <produto>Fritadeira a gas</produto>
+                <volume>2 a 3 unidades</volume>
+                <urgencia>media</urgencia>
+                <engajamento>45%</engajamento>
+            </dados>
+            <classificacao>morno - Lead informou dados basicos e demonstrou interesse em fritadeiras, mas volume pequeno e sem urgencia alta.</classificacao>
+        </exemplo>
+
+        <exemplo temperatura="quente">
+            <dados>
+                <nome>Maria Silva</nome>
+                <empresa>Rede de Restaurantes Fast Food Ltda</empresa>
+                <cidade>Rio de Janeiro</cidade>
+                <produto>Fritadeiras FB300 e FBM100</produto>
+                <volume>50 unidades para 10 lojas</volume>
+                <urgencia>alta - inauguracao em 2 meses</urgencia>
+                <engajamento>85%</engajamento>
+            </dados>
+            <classificacao>quente - Lead com dados completos, volume alto (50 unidades), urgencia alta (inauguracao proxima) e interesse em produtos especificos.</classificacao>
+        </exemplo>
+    </exemplos>
+
+    <pesos>
+        <peso criterio="engajamento" valor="25%">Taxa de resposta e qualidade das interacoes</peso>
+        <peso criterio="completude" valor="25%">Quantidade de dados coletados do lead</peso>
+        <peso criterio="volume" valor="25%">Quantidade ou valor estimado do pedido</peso>
+        <peso criterio="urgencia" valor="25%">Necessidade imediata de compra</peso>
+    </pesos>
+</calcula_temperatura>

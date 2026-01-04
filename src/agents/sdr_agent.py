@@ -25,27 +25,60 @@ from src.services.unavailable_products import get_espeto_context_for_agent
 from src.services.upsell import get_upsell_context_for_agent
 from src.services.lead_persistence import get_persisted_lead_data, persist_lead_data
 from src.services.prompt_loader import get_system_prompt_path, load_system_prompt_from_xml
+from src.services.temperature_classification import classify_lead, should_classify_lead
 from src.utils.logging import get_logger, set_phone
 
 logger = get_logger(__name__)
 
-# System prompt loaded at module level
+# System prompt loaded at module level (cached for performance)
+# Cache is cleared on process restart, allowing prompt changes to take effect
 _system_prompt: Optional[str] = None
 
 
-def _load_system_prompt() -> str:
+def _load_system_prompt(force_reload: bool = False) -> str:
     """
     Load system prompt from XML file.
 
+    The prompt is cached in memory for performance. Cache is automatically
+    cleared on process restart, so changes to the XML file take effect
+    after restarting the service.
+
+    Args:
+        force_reload: If True, reload from file even if cached
+
     Returns:
         System prompt as formatted string
+
+    Raises:
+        FileNotFoundError: If prompt XML file doesn't exist
+        ValueError: If prompt path is invalid (security check)
+        ET.ParseError: If XML is malformed
     """
     global _system_prompt
-    if _system_prompt is None:
+    if _system_prompt is None or force_reload:
         prompt_path = get_system_prompt_path("sp_agente_v1.xml")
+        logger.info(
+            "Loading system prompt from XML",
+            extra={"path": str(prompt_path), "force_reload": force_reload},
+        )
         _system_prompt = load_system_prompt_from_xml(prompt_path)
-        logger.info("System prompt loaded", extra={"prompt_length": len(_system_prompt)})
+        logger.info(
+            "System prompt loaded successfully",
+            extra={"prompt_length": len(_system_prompt), "path": str(prompt_path)},
+        )
     return _system_prompt
+
+
+def reload_system_prompt() -> str:
+    """
+    Force reload the system prompt from XML file.
+
+    Useful for development/testing to reload prompt without restarting.
+
+    Returns:
+        Newly loaded system prompt
+    """
+    return _load_system_prompt(force_reload=True)
 
 
 def create_sdr_agent() -> Agent:
@@ -140,6 +173,37 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
         await persist_lead_data(normalized_phone, extracted_data)
         # Update local lead_data with new extracted data
         lead_data = {**lead_data, **extracted_data}
+
+    # US-006/TECH-011: Classify lead temperature if criteria met
+    if should_classify_lead(lead_data):
+        try:
+            # Get conversation history for classification
+            conv_history = conversation_memory.get_messages_for_llm(
+                normalized_phone, max_messages=20
+            )
+            temperature, justification = await classify_lead(
+                phone=normalized_phone,
+                lead_data=lead_data,
+                conversation_history=conv_history,
+            )
+            if temperature:
+                logger.info(
+                    "Lead classified successfully",
+                    extra={
+                        "phone": normalized_phone,
+                        "temperature": temperature,
+                        "justification_preview": justification[:50] if justification else "",
+                    },
+                )
+                # Update local lead_data with temperature
+                lead_data["temperature"] = temperature
+                lead_data["temperature_justification"] = justification
+        except Exception as e:
+            logger.warning(
+                "Failed to classify lead temperature",
+                extra={"phone": normalized_phone, "error": str(e)},
+            )
+            # Continue without classification - non-blocking
 
     # Reset question count when user responds (US-002: controle de ritmo)
     conversation_memory.reset_question_count(normalized_phone)

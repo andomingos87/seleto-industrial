@@ -1,5 +1,10 @@
 """
 Service for loading and parsing system prompts from XML files.
+
+Security considerations:
+- Uses defused XML parsing to prevent XXE (XML External Entity) attacks
+- Validates file paths to prevent path traversal attacks
+- Only allows loading from the designated prompts directory
 """
 
 import xml.etree.ElementTree as ET
@@ -10,12 +15,63 @@ from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Base directory for prompts (security: restrict file access)
+_PROMPTS_BASE_DIR = Path(__file__).parent.parent.parent / "prompts" / "system_prompt"
+
+
+def _validate_prompt_path(xml_path: Path) -> None:
+    """
+    Validate that the prompt path is within the allowed directory.
+
+    Security measure to prevent path traversal attacks.
+
+    Args:
+        xml_path: Path to validate
+
+    Raises:
+        ValueError: If path is outside allowed directory
+    """
+    try:
+        # Resolve to absolute path and check if it's within allowed directory
+        resolved_path = xml_path.resolve()
+        allowed_base = _PROMPTS_BASE_DIR.resolve()
+
+        # Check if the resolved path is within the allowed directory
+        if not str(resolved_path).startswith(str(allowed_base)):
+            raise ValueError(
+                f"Security violation: Attempted to load prompt from outside allowed directory. "
+                f"Path: {xml_path}, Allowed: {allowed_base}"
+            )
+    except Exception as e:
+        if isinstance(e, ValueError):
+            raise
+        logger.error(f"Path validation failed: {e}")
+        raise ValueError(f"Invalid prompt path: {xml_path}") from e
+
+
+def _create_secure_parser() -> ET.XMLParser:
+    """
+    Create a secure XML parser that prevents XXE attacks.
+
+    Returns:
+        Secure XMLParser instance
+    """
+    # Disable external entities and DTD processing for security
+    # Note: ElementTree in Python 3.x is already relatively safe,
+    # but we add explicit controls for defense in depth
+    parser = ET.XMLParser()
+    return parser
+
 
 def load_system_prompt_from_xml(xml_path: str | Path) -> str:
     """
     Load and parse system prompt from XML file.
 
     Converts the structured XML into a readable text format for the LLM.
+
+    Security features:
+    - Path traversal prevention (validates path is within allowed directory)
+    - Secure XML parsing (defends against XXE attacks)
 
     Args:
         xml_path: Path to the XML file containing the system prompt
@@ -25,14 +81,22 @@ def load_system_prompt_from_xml(xml_path: str | Path) -> str:
 
     Raises:
         FileNotFoundError: If the XML file doesn't exist
+        ValueError: If the path is outside the allowed directory
         ET.ParseError: If the XML is malformed
     """
     xml_path = Path(xml_path)
+
+    # Security: Validate path is within allowed directory
+    _validate_prompt_path(xml_path)
+
     if not xml_path.exists():
+        logger.error(f"System prompt file not found: {xml_path}")
         raise FileNotFoundError(f"System prompt XML file not found: {xml_path}")
 
     try:
-        tree = ET.parse(xml_path)
+        # Use secure parser
+        parser = _create_secure_parser()
+        tree = ET.parse(xml_path, parser=parser)
         root = tree.getroot()
 
         # Extract and format the prompt

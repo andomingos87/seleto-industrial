@@ -443,12 +443,15 @@
 - **Tipo**: Technical Story
 - **Descrição**: Configurar o agente com o prompt do sistema definido em `prompts/system_prompt/sp_agente_v1.xml`.
 - **Critérios de Aceitação**:
-  - [ ] Prompt carregado do arquivo XML
-  - [ ] Prompt aplicado em todas as sessões de conversa
-  - [ ] Alterações no arquivo refletem após restart
+  - [x] Prompt carregado do arquivo XML
+  - [x] Prompt aplicado em todas as sessões de conversa
+  - [x] Alterações no arquivo refletem após restart
 - **Dependências**: TECH-001
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído
+- **Data de Conclusão**: 2026-01-27
+- **Data de Revisão**: 2026-01-27
 
 ---
 
@@ -456,33 +459,73 @@
 
 > Classificar leads em frio/morno/quente.
 
-### US-006: Classificar lead ao final da qualificação
+### US-006: Classificar lead ao final da qualificação ✅
 
 - **Tipo**: User Story
 - **Descrição**: Como SDR, quero que o agente classifique cada lead como frio, morno ou quente, para priorizar meu tempo.
 - **Critérios de Aceitação**:
-  - [ ] Lead classificado em uma das três temperaturas: frio, morno, quente
-  - [ ] Classificação considera: engajamento, completude dos dados, volume, urgência
-  - [ ] Classificação persistida no banco (campo `temperature` em `leads`)
-  - [ ] Justificativa mínima registrada (ex: "respondeu todas as perguntas, urgência alta")
+  - [x] Lead classificado em uma das três temperaturas: frio, morno, quente
+  - [x] Classificação considera: engajamento, completude dos dados, volume, urgência
+  - [x] Classificação persistida no banco (campo `temperature` no contexto do lead via Supabase)
+  - [x] Justificativa mínima registrada (ex: "respondeu todas as perguntas, urgência alta")
 - **Dependências**: US-002, TECH-011
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-04)
+- **Artefatos**:
+  - `src/services/temperature_classification.py` - Serviço de classificação de temperatura
+  - `src/agents/sdr_agent.py` - Integração da classificação no fluxo de processamento (linhas 177-206)
+  - `prompts/system_prompt/sp_calcula_temperatura.xml` - Prompt XML com critérios de classificação
+  - `tests/services/test_temperature_classification.py` - 37 testes unitários
+  - `tests/agents/test_sdr_agent_temperature.py` - 10 testes de integração
+- **Validação**:
+  - ✅ Função `calculate_temperature()` classifica leads como frio, morno ou quente
+  - ✅ Score de engajamento calculado a partir do histórico de conversa (respostas, tamanho das mensagens)
+  - ✅ Score de completude calculado a partir dos dados coletados (campos preenchidos)
+  - ✅ Volume e urgência considerados na classificação via LLM
+  - ✅ Temperatura persistida no campo `temperature` do contexto do lead no Supabase
+  - ✅ Justificativa persistida no campo `temperature_justification`
+  - ✅ Fallback para classificação por regras quando LLM indisponível
+  - ✅ 47 testes passando (37 unitários + 10 integração)
 
 ---
 
-### TECH-011: Implementar lógica de classificação de temperatura
+### TECH-011: Implementar lógica de classificação de temperatura ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar módulo/função que calcula temperatura do lead com base nos dados coletados, usando prompt `sp_calcula_temperatura.xml`.
 - **Critérios de Aceitação**:
-  - [ ] Função `calculate_temperature(lead_data) -> (temperature, justification)`
-  - [ ] Critérios: engajamento (respondeu perguntas), volume, urgência, fit com portfólio
-  - [ ] Prompt de temperatura carregado de `prompts/system_prompt/sp_calcula_temperatura.xml`
-  - [ ] Retorno inclui justificativa textual
+  - [x] Função `calculate_temperature(lead_data) -> (temperature, justification)`
+  - [x] Critérios: engajamento (respondeu perguntas), volume, urgência, fit com portfólio
+  - [x] Prompt de temperatura carregado de `prompts/system_prompt/sp_calcula_temperatura.xml`
+  - [x] Retorno inclui justificativa textual
 - **Dependências**: TECH-010
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-04)
+- **Artefatos**:
+  - `src/services/temperature_classification.py` - Módulo com funções:
+    - `calculate_temperature(lead_data, conversation_summary, conversation_history, phone)` - Função principal
+    - `calculate_engagement_score(phone, conversation_history)` - Cálculo de engajamento
+    - `calculate_completeness_score(lead_data)` - Cálculo de completude
+    - `load_temperature_prompt()` - Carregamento do prompt XML
+    - `update_lead_temperature(phone, temperature, justification)` - Persistência
+    - `should_classify_lead(lead_data)` - Verificação de critérios para classificar
+    - `classify_lead(phone, lead_data, conversation_history)` - Função de alto nível
+  - `prompts/system_prompt/sp_calcula_temperatura.xml` - Prompt com critérios detalhados:
+    - Critérios para frio: baixo engajamento, dados incompletos, sem urgência
+    - Critérios para morno: engajamento moderado, dados parciais, urgência baixa/média
+    - Critérios para quente: alto engajamento, dados completos, urgência alta, volume significativo
+    - Exemplos de classificação para cada temperatura
+    - Pesos: engajamento (25%), completude (25%), volume (25%), urgência (25%)
+- **Validação**:
+  - ✅ Função `calculate_temperature()` retorna tupla (temperatura, justificativa)
+  - ✅ Critérios de engajamento calculados: taxa de resposta, tamanho médio das mensagens, número de mensagens
+  - ✅ Critérios de completude calculados: campos obrigatórios (60%) e opcionais (40%)
+  - ✅ Urgência e volume incluídos no contexto enviado ao LLM
+  - ✅ Prompt XML carregado e formatado corretamente
+  - ✅ Justificativa textual retornada em todas as classificações
+  - ✅ Fallback baseado em regras quando LLM falha
 
 ---
 
