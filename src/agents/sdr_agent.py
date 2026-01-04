@@ -1,10 +1,281 @@
 """
-SDR Agent - Placeholder para o agente principal de qualificação de leads.
+SDR Agent - Conversational agent for lead qualification.
 
-Este módulo será expandido em TECH-009/TECH-010 para incluir:
-- Base de conhecimento de produtos
-- Prompt do sistema
-- Ferramentas de integração com CRM
+This module implements the main agent logic with system prompt loading,
+conversation memory, and response generation.
 """
 
-# Placeholder - será implementado em tasks futuras
+import asyncio
+import time
+from typing import Optional
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+
+from src.config.settings import settings
+from src.services.conversation_memory import conversation_memory
+from src.services.data_extraction import extract_lead_data
+from src.services.lead_persistence import get_persisted_lead_data, persist_lead_data
+from src.services.prompt_loader import get_system_prompt_path, load_system_prompt_from_xml
+from src.utils.logging import get_logger, set_phone
+
+logger = get_logger(__name__)
+
+# System prompt loaded at module level
+_system_prompt: Optional[str] = None
+
+
+def _load_system_prompt() -> str:
+    """
+    Load system prompt from XML file.
+
+    Returns:
+        System prompt as formatted string
+    """
+    global _system_prompt
+    if _system_prompt is None:
+        prompt_path = get_system_prompt_path("sp_agente_v1.xml")
+        _system_prompt = load_system_prompt_from_xml(prompt_path)
+        logger.info("System prompt loaded", extra={"prompt_length": len(_system_prompt)})
+    return _system_prompt
+
+
+def create_sdr_agent() -> Agent:
+    """
+    Create and configure the SDR agent.
+
+    Returns:
+        Configured Agent instance
+    """
+    system_prompt = _load_system_prompt()
+
+    agent = Agent(
+        name="Seleto SDR",
+        model=OpenAIChat(id=settings.OPENAI_MODEL),
+        description="Agente de qualificação de leads para Seleto Industrial",
+        instructions=[system_prompt],
+        markdown=True,
+    )
+
+    logger.info("SDR agent created and configured")
+    return agent
+
+
+# Global agent instance
+sdr_agent = create_sdr_agent()
+
+
+async def process_message(phone: str, message: str, sender_name: Optional[str] = None) -> str:
+    """
+    Process an incoming message and generate a response.
+
+    This function:
+    1. Adds the user message to conversation history
+    2. Checks if it's the first message (to send greeting)
+    3. Generates agent response using conversation context
+    4. Adds agent response to conversation history
+    5. Returns the response text
+
+    Args:
+        phone: Phone number of the sender (will be normalized)
+        message: Message text from the user
+        sender_name: Optional sender name
+
+    Returns:
+        Response text from the agent
+
+    Raises:
+        Exception: If agent processing fails
+    """
+    from src.utils.validation import normalize_phone
+
+    normalized_phone = normalize_phone(phone)
+    if not normalized_phone:
+        raise ValueError(f"Invalid phone number: {phone}")
+
+    # Set phone in context for logging
+    set_phone(normalized_phone)
+
+    start_time = time.perf_counter()
+
+    # Check if this is the first message
+    is_first = conversation_memory.is_first_message(normalized_phone)
+
+    # Get persisted lead data (from memory or Supabase)
+    lead_data = get_persisted_lead_data(normalized_phone)
+
+    # Extract new data from user message (US-002: coleta progressiva)
+    extracted_data = await extract_lead_data(message, current_data=lead_data)
+
+    # Persist extracted data (even if partial - US-002 requirement)
+    if extracted_data:
+        await persist_lead_data(normalized_phone, extracted_data)
+        # Update local lead_data with new extracted data
+        lead_data = {**lead_data, **extracted_data}
+
+    # Reset question count when user responds (US-002: controle de ritmo)
+    conversation_memory.reset_question_count(normalized_phone)
+
+    # Get conversation history for context
+    conversation_history = conversation_memory.get_messages_for_llm(normalized_phone, max_messages=20)
+
+    # Get question count to enforce rate limit (US-002: máximo 2 perguntas diretas)
+    question_count = conversation_memory.get_question_count(normalized_phone)
+
+    # Build context message for the agent
+    context_parts = []
+
+    # Add lead data context if available
+    if lead_data:
+        context_parts.append("\n=== DADOS COLETADOS DO LEAD ===")
+        for key, value in lead_data.items():
+            if value:
+                context_parts.append(f"{key}: {value}")
+
+    # Add question count context (for rate control)
+    if question_count >= 2:
+        context_parts.append(
+            f"\n⚠️ ATENÇÃO: Você já fez {question_count} perguntas diretas seguidas. "
+            "NÃO faça mais perguntas diretas nesta resposta. "
+            "Use as informações já coletadas para contextualizar sua resposta ou aguarde mais informações do lead."
+        )
+
+    # Build the full message with context
+    full_message = message
+    if context_parts:
+        full_message = "\n".join(context_parts) + "\n\n=== MENSAGEM DO LEAD ===\n" + message
+
+    # Generate response using the agent
+    try:
+        # Use the agent's run method
+        # For Agno, we use run() which handles the conversation
+        # We'll use the phone as a session identifier
+        # Note: run() may be synchronous, so we run it in a thread pool
+        # Note: Agno may handle thread_id differently, so we'll pass it if supported
+        try:
+            response = await asyncio.to_thread(
+                sdr_agent.run,
+                message=full_message,
+                stream=False,
+                thread_id=normalized_phone,  # Use phone as thread ID for conversation continuity
+            )
+        except TypeError:
+            # If thread_id is not supported, use run without it
+            response = await asyncio.to_thread(
+                sdr_agent.run,
+                message=full_message,
+                stream=False,
+            )
+
+        # Extract response text
+        response_text = ""
+        if hasattr(response, "content"):
+            response_text = response.content
+        elif hasattr(response, "messages") and response.messages:
+            # Get the last message from the response
+            last_msg = response.messages[-1]
+            if hasattr(last_msg, "content"):
+                response_text = last_msg.content
+            else:
+                response_text = str(last_msg)
+        elif isinstance(response, str):
+            response_text = response
+        else:
+            # Try to get text from response object
+            response_text = str(response)
+
+        # Ensure response is not empty
+        if not response_text or not response_text.strip():
+            logger.warning("Empty response from agent, using fallback")
+            if is_first:
+                response_text = (
+                    "Olá! Seja bem-vindo à Seleto Industrial 👋\n"
+                    "Sou seu assistente virtual e estou aqui para ajudar.\n"
+                    "Pode me contar um pouco sobre o que está buscando?"
+                )
+            else:
+                response_text = "Desculpe, não entendi. Pode repetir?"
+
+        # Check if response contains direct questions (simple heuristic)
+        # This is a basic check - the prompt should also enforce this
+        question_indicators = ["?", "pode", "você", "qual", "quando", "onde", "como", "quanto"]
+        has_question = "?" in response_text
+        is_direct_question = has_question and any(
+            indicator in response_text.lower() for indicator in question_indicators
+        )
+
+        # Track question count for rate control (US-002)
+        if is_direct_question:
+            conversation_memory.increment_question_count(normalized_phone)
+            question_count = conversation_memory.get_question_count(normalized_phone)
+            if question_count > 2:
+                logger.warning(
+                    "Agent exceeded question rate limit",
+                    extra={
+                        "phone": normalized_phone,
+                        "question_count": question_count,
+                    },
+                )
+
+        # Add user message to conversation history (after processing)
+        conversation_memory.add_message(normalized_phone, "user", message)
+
+        # Add agent response to conversation history
+        conversation_memory.add_message(normalized_phone, "assistant", response_text)
+
+        # Calculate response time
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        logger.info(
+            "Message processed successfully",
+            extra={
+                "phone": normalized_phone,
+                "is_first_message": is_first,
+                "response_length": len(response_text),
+                "duration_ms": duration_ms,
+                "conversation_length": len(conversation_history) + 2,  # +2 for user and assistant messages
+            },
+        )
+
+        # Check if response time exceeds 5 seconds (requirement: < 5s)
+        if duration_ms > 5000:
+            logger.warning(
+                "Response time exceeded 5 seconds",
+                extra={
+                    "phone": normalized_phone,
+                    "duration_ms": duration_ms,
+                },
+            )
+
+        return response_text
+
+    except Exception as e:
+        logger.error(
+            "Failed to process message with agent",
+            extra={
+                "phone": normalized_phone,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+
+        # Fallback response
+        if is_first:
+            fallback_response = (
+                "Olá! Seja bem-vindo à Seleto Industrial 👋\n"
+                "Sou seu assistente virtual e estou aqui para ajudar.\n"
+                "Pode me contar um pouco sobre o que está buscando?"
+            )
+        else:
+            fallback_response = (
+                "Desculpe, tive um problema técnico. "
+                "Pode repetir sua mensagem?"
+            )
+
+        # Add user message to history
+        conversation_memory.add_message(normalized_phone, "user", message)
+
+        # Add fallback to history
+        conversation_memory.add_message(normalized_phone, "assistant", fallback_response)
+
+        return fallback_response

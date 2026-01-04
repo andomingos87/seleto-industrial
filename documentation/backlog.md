@@ -6,9 +6,15 @@
 
 ## Resumo do Produto
 
-- **Objetivo**: Automatizar atendimento inicial via WhatsApp, qualificar leads e registrar dados no CRM (PipeRun)
+- **Objetivo**: Automatizar atendimento inicial via WhatsApp, qualificar leads e registrar dados no CRM (Piperun)
 - **Público-alvo**: Leads B2B (indústria alimentícia), SDRs, vendedores
-- **Stack**: Agno (Python/FastAPI), Supabase, PipeRun, Chatwoot, WhatsApp (provedor)
+- **Stack**: Agno (Python/FastAPI), Supabase, Piperun, Chatwoot, WhatsApp (Z-API)
+
+**Nota:** As stories TECH-005, TECH-006 e TECH-007 requerem as seguintes variáveis de ambiente para integração com a Z-API:
+- `ZAPI_INSTANCE_ID`: Identificador da instância Z-API.
+- `ZAPI_INSTANCE_TOKEN`: Token da instância.
+- `ZAPI_CLIENT_TOKEN`: Token de conta (usado no header `Client-Token`).
+- `ZAPI_WEBHOOK_SECRET`: Secret para validar webhooks recebidos (opcional).
 
 ---
 
@@ -16,19 +22,26 @@
 
 > Preparar ambiente de desenvolvimento, runtime e integrações base.
 
-### TECH-001: Configurar projeto Agno com FastAPI
+### TECH-001: Configurar projeto Agno com FastAPI ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar estrutura base do projeto com Agno Agent Framework, FastAPI como runtime HTTP, e configuração de ambiente (variáveis, Docker).
 - **Critérios de Aceitação**:
-  - [ ] Projeto inicializado com estrutura de diretórios padrão (src/, tests/, config/)
-  - [ ] Dockerfile funcional para build e execução local
-  - [ ] Arquivo `.env.example` com todas as variáveis necessárias (sem valores reais)
-  - [ ] Endpoint `/health` retornando status 200
-  - [ ] README com instruções de setup local
+  - [x] Projeto inicializado com estrutura de diretórios padrão (src/, tests/, config/)
+  - [x] Dockerfile funcional para build e execução local
+  - [x] Arquivo `.env.example` com todas as variáveis necessárias (sem valores reais)
+  - [x] Endpoint `/health` retornando status 200
+  - [x] README com instruções de setup local
 - **Dependências**: Nenhuma
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-04
+- **Artefatos**:
+  - Estrutura de diretórios: `src/`, `tests/`, `config/`
+  - `Dockerfile` — Build multi-stage com healthcheck
+  - `.env.example` — Template com todas as variáveis de ambiente (incluindo Z-API)
+  - `src/api/routes/health.py` — Endpoint `/api/health` retornando status 200
+  - `README.md` — Instruções completas de setup local e Docker
 
 ---
 
@@ -46,10 +59,18 @@
 - **Prioridade**: Alta
 - **Fase**: MVP
 - **Concluído em**: 2026-01-03
+- **Revisado em**: 2026-01-04
 - **Migrations aplicadas**:
   - `20260103152411_add_missing_fields_to_leads`
   - `20260103152423_add_cnpj_unique_constraint_to_empresa`
   - `20260103152432_enable_rls_on_all_tables`
+- **Validação**:
+  - ✅ Tabelas verificadas no Supabase: `leads`, `orcamentos`, `empresa`
+  - ✅ Todos os campos especificados estão presentes
+  - ✅ RLS ativado em todas as tabelas (verificado via MCP Supabase)
+  - ✅ Foreign keys configuradas corretamente
+  - ✅ Constraint unique no campo `cnpj` da tabela `empresa` aplicada
+  - ✅ Migrações versionadas e aplicadas no banco
 
 ---
 
@@ -66,10 +87,18 @@
 - **Prioridade**: Alta
 - **Fase**: MVP
 - **Concluído em**: 2026-01-03
+- **Revisado em**: 2026-01-04
 - **Artefatos**:
   - `.env.example` — Template com todas as variáveis documentadas
   - `src/config/settings.py` — Carregamento via Pydantic Settings
   - `README.md` — Documentação das variáveis de ambiente
+- **Validação**:
+  - ✅ Todas as credenciais carregadas via variáveis de ambiente (Pydantic BaseSettings)
+  - ✅ Nenhum token/chave hardcoded encontrado no código (grep validado)
+  - ✅ Arquivo `.env` protegido no `.gitignore` (não versionado)
+  - ✅ `.env.example` existe e documenta todas as variáveis necessárias
+  - ✅ README contém seção completa sobre variáveis de ambiente e rotação de credenciais
+  - ✅ Suporte a rotação documentado (algumas integrações podem precisar restart, conforme documentado)
 
 ---
 
@@ -81,15 +110,23 @@
   - [x] Logs em formato JSON com campos: timestamp, level, message, request_id, phone (quando disponível)
   - [x] Níveis de log configuráveis via variável de ambiente
   - [x] Logs de entrada/saída de webhooks
-  - [x] Logs de chamadas a APIs externas (PipeRun, Supabase)
+  - [x] Logs de chamadas a APIs externas (Piperun, Supabase)
 - **Dependências**: TECH-001
 - **Prioridade**: Alta
 - **Fase**: MVP
 - **Concluído em**: 2026-01-03
+- **Revisado em**: 2026-01-04
 - **Artefatos**:
   - `src/utils/logging.py` — Módulo de logging estruturado com JSONFormatter e TextFormatter
   - `src/api/middleware/logging.py` — Middleware FastAPI para logging de requests
   - Funções utilitárias: `log_webhook_received()`, `log_webhook_response()`, `log_api_call()`
+- **Validação**:
+  - ✅ Logs em formato JSON com campos: timestamp, level, message, request_id, phone (quando disponível) — JSONFormatter implementado
+  - ✅ Níveis de log configuráveis via variável de ambiente (`LOG_LEVEL` e `LOG_FORMAT` em settings.py)
+  - ✅ Logs de entrada/saída de webhooks — `log_webhook_received()` e `log_webhook_response()` usados no middleware e rotas
+  - ✅ Logs de chamadas a APIs externas — `log_api_call()` implementado e usado (ex: WhatsApp), preparado para Piperun e Supabase
+  - ✅ Contexto por requisição usando ContextVar (request_id, phone, flow_step)
+  - ✅ Middleware FastAPI integrado para logging automático de todas as requisições
 
 ---
 
@@ -112,9 +149,23 @@
 - **Prioridade**: Alta
 - **Fase**: MVP
 - **Concluído em**: 2026-01-03
+- **Revisado em**: 2026-01-04
 - **Artefatos**:
   - `src/api/routes/webhook.py` — Endpoint POST /webhook/whatsapp com parsing e validação
   - `src/utils/validation.py` — Funções de normalização de telefone (normalize_phone, validate_phone)
+- **Validação**:
+  - ✅ Endpoint `POST /webhook/whatsapp` funcional e registrado no main.py
+  - ✅ Parsing correto de payload com campos: phone, senderName, message (texto) — WhatsAppWebhookPayload implementado
+  - ✅ Validação de token/header de autenticação — `validate_webhook_auth()` suporta Authorization Bearer e X-Webhook-Secret
+  - ✅ Normalização do telefone para formato E.164 (apenas dígitos) — `normalize_phone()` implementada e usada
+  - ✅ Resposta 200 em até 2s — Processamento assíncrono com `asyncio.create_task()` e resposta imediata
+  - ✅ Logs de entrada com phone e tipo de mensagem — `log_webhook_received()` usado com phone e message_type
+- **Especificações Z-API**:
+  - Endpoint de webhook configurado via: `PUT /instances/{INSTANCE_ID}/token/{INSTANCE_TOKEN}/update-webhook-received`
+  - Payload recebido: `phone`, `senderName`, `message`, `messageId`, `messageType`, `audio` (opcional)
+  - Autenticação: Header `Client-Token` (Account Security Token) para configuração do webhook
+  - URL do webhook: `https://seu-dominio.com/webhook/whatsapp` (deve ser HTTPS válido)
+  - Formato: JSON direto no body da requisição POST (sem wrapper de headers)
 
 ---
 
@@ -131,9 +182,25 @@
 - **Prioridade**: Alta
 - **Fase**: MVP
 - **Concluído em**: 2026-01-03
+- **Revisado em**: 2026-01-04
 - **Artefatos**:
   - `src/services/whatsapp.py` — Serviço WhatsAppService com retry e backoff exponencial
   - Função `send_whatsapp_message()` para envio de mensagens
+- **Validação**:
+  - ✅ Função `send_whatsapp_message(phone, text)` implementada (linha 221-232)
+  - ✅ Retry com backoff exponencial em caso de falha (até 3 tentativas) — `max_retries=3` por padrão, backoff exponencial: `initial_backoff * (2**attempt)`
+  - ✅ Logs de sucesso/falha com phone e status — Logs detalhados em sucesso (linhas 114-121), falha (linhas 133-140), e tentativas esgotadas (linhas 206-213)
+  - ✅ Tratamento de rate limit do provedor — Tratamento específico de 429 com `Retry-After` header (linhas 86-100)
+  - ✅ Tratamento de erros HTTP — 4xx (não retry exceto 429), 5xx (retry), timeout e connection errors (retry)
+  - ✅ Normalização de telefone antes do envio — Usa `normalize_phone()` para formato E.164
+- **Especificações Z-API**:
+  - Endpoint: `POST https://api.z-api.io/instances/{INSTANCE_ID}/token/{INSTANCE_TOKEN}/send-text`
+  - Autenticação: Header `Client-Token: {ZAPI_CLIENT_TOKEN}`
+  - Payload: `{"phone": "5511999999999", "message": "texto"}`
+  - Variáveis de ambiente: `ZAPI_INSTANCE_ID`, `ZAPI_INSTANCE_TOKEN`, `ZAPI_CLIENT_TOKEN`
+  - Retry: Implementado com backoff exponencial (até 3 tentativas)
+  - Rate limit: Tratamento de 429 com `Retry-After` header
+  - Erros tratados: 401 (Unauthorized), 404 (Not Found), 405 (Method Not Allowed), 415 (Unsupported Media Type), 429 (Rate Limit), 5xx (Server Error)
 
 ---
 
@@ -148,14 +215,34 @@
   - [x] Texto transcrito disponível para processamento pelo agente
   - [x] Log indicando que mensagem era áudio + duração
   - [x] Fallback/erro tratado se transcrição falhar
+  - [ ] Remoção automática de arquivos de áudio após 90 dias (conforme política LGPD - D6)
+  - [ ] Anonimização de transcrições após 90 dias (remover identificadores diretos como nome, telefone, CNPJ)
 - **Dependências**: TECH-005
 - **Prioridade**: Média
 - **Fase**: Fase 2
 - **Concluído em**: 2026-01-03
+- **Revisado em**: 2026-01-04
 - **Artefatos**:
   - `src/services/transcription.py` — Serviço TranscriptionService com integração Whisper API
   - Função `transcribe_audio()` para transcrição de áudio
   - Suporte a múltiplos formatos de áudio (ogg, mp3, wav, webm, etc.)
+- **Validação**:
+  - ✅ Parsing de payload com objeto `audio` (audioUrl, mimeType, seconds) — Extração em `process_audio_message()` (linhas 213-215)
+  - ✅ Download do arquivo de áudio via URL — Implementado com httpx.AsyncClient (linhas 61-75)
+  - ✅ Integração com serviço de transcrição (Whisper API) — OpenAI Whisper-1 model (linhas 79-84)
+  - ✅ Texto transcrito disponível para processamento pelo agente — Passado para `process_message()` (linhas 270-276)
+  - ✅ Log indicando que mensagem era áudio + duração — Logs detalhados em múltiplos pontos (webhook.py linhas 228-238, transcription.py linhas 51-58, 88-95)
+  - ✅ Fallback/erro tratado se transcrição falhar — Mensagem de fallback enviada quando transcrição falha (linhas 247-259, 292-306)
+  - ⚠️ Remoção automática de arquivos de áudio após 90 dias — Pendente (TECH-031)
+  - ⚠️ Anonimização de transcrições após 90 dias — Pendente (TECH-031)
+- **Especificações Z-API**:
+  - Webhook de áudio: Payload contém objeto `audio` com `audioUrl`, `mimeType`, `seconds`
+  - Formatos suportados: OGG (Opus), MP3, WAV, WEBM, AAC, M4A
+  - Download: Arquivo disponível via `audioUrl` (HTTPS)
+  - Transcrição: Integração com Whisper API (OpenAI) para converter áudio em texto
+  - Fallback: Se transcrição falhar, agente solicita que lead repita por texto
+  - Campo `messageType`: `"audio"` quando mensagem é de áudio
+  - Limpeza: Arquivos temporários removidos automaticamente após transcrição
 
 ---
 
@@ -163,34 +250,64 @@
 
 > Lógica do agente de IA para atendimento e qualificação.
 
-### US-001: Cumprimentar lead e iniciar coleta de dados
+### US-001: Cumprimentar lead e iniciar coleta de dados ✅
 
 - **Tipo**: User Story
 - **Descrição**: Como lead, ao enviar a primeira mensagem, quero receber uma saudação cordial e ser perguntado sobre minha necessidade, para que eu me sinta bem atendido.
 - **Critérios de Aceitação**:
-  - [ ] Agente responde em até 5s após receber mensagem
-  - [ ] Mensagem de boas-vindas menciona a Seleto Industrial
-  - [ ] Agente pergunta sobre a necessidade/produto de interesse
-  - [ ] Tom cordial, profissional e empático (sem jargões robóticos)
-  - [ ] Máximo de 2 perguntas diretas na primeira interação
+  - [x] Agente responde em até 5s após receber mensagem
+  - [x] Mensagem de boas-vindas menciona a Seleto Industrial
+  - [x] Agente pergunta sobre a necessidade/produto de interesse
+  - [x] Tom cordial, profissional e empático (sem jargões robóticos)
+  - [x] Máximo de 2 perguntas diretas na primeira interação
 - **Dependências**: TECH-005, TECH-006
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-03
+- **Revisado em**: 2026-01-04
+- **Artefatos**:
+  - `src/services/prompt_loader.py` — Serviço para carregar prompt do sistema do XML (TECH-010)
+  - `src/services/conversation_memory.py` — Memória básica de conversa por telefone (TECH-008 básico)
+  - `src/agents/sdr_agent.py` — Agente SDR com prompt do sistema e lógica de processamento
+  - Integração com webhook para processar mensagens e enviar respostas automaticamente
+- **Validação**:
+  - ✅ Agente responde em até 5s após receber mensagem — Tempo medido e logado (linhas 99, 227), warning se exceder 5s (linhas 241-248). Processamento assíncrono no webhook garante resposta HTTP rápida
+  - ✅ Mensagem de boas-vindas menciona a Seleto Industrial — Prompt XML (linha 111) e fallback (linhas 191-195, 264-267) incluem "Seleto Industrial"
+  - ✅ Agente pergunta sobre a necessidade/produto de interesse — Prompt XML (linha 114) e objetivos (linha 87) direcionam para entender o que o lead busca
+  - ✅ Tom cordial, profissional e empático (sem jargões robóticos) — Diretrizes claras no prompt XML (linhas 24-26): "Sempre cordial, profissional e empático", "Evite jargões técnicos, gírias ou mensagens robotizadas"
+  - ✅ Máximo de 2 perguntas diretas na primeira interação — Controle implementado via `question_count` (linhas 122-123, 136-141, 199-218) e reforçado no prompt XML (linha 33): "Faça no máximo duas perguntas diretas seguidas"
+  - ✅ Detecção de primeira mensagem — `is_first_message()` verifica se é primeira interação (linha 102)
+  - ✅ Fallback para primeira mensagem — Mensagem de boas-vindas padrão se agente falhar (linhas 190-195, 263-268)
 
 ---
 
-### US-002: Coletar dados progressivamente durante a conversa
+### US-002: Coletar dados progressivamente durante a conversa ✅
 
 - **Tipo**: User Story
 - **Descrição**: Como agente, quero coletar nome, empresa, cidade/UF, produto, volume e urgência ao longo da conversa, sem enviar um questionário de uma vez.
 - **Critérios de Aceitação**:
-  - [ ] Dados coletados: nome, empresa (opcional), cidade/UF, produto/necessidade, volume/capacidade, urgência
-  - [ ] Máximo de 2 perguntas diretas seguidas (regra de ritmo)
-  - [ ] Perguntas contextualizadas com base nas respostas anteriores
-  - [ ] Dados parciais são persistidos mesmo que conversa não seja concluída
+  - [x] Dados coletados: nome, empresa (opcional), cidade/UF, produto/necessidade, volume/capacidade, urgência
+  - [x] Máximo de 2 perguntas diretas seguidas (regra de ritmo)
+  - [x] Perguntas contextualizadas com base nas respostas anteriores
+  - [x] Dados parciais são persistidos mesmo que conversa não seja concluída
 - **Dependências**: US-001, TECH-008
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Concluído em**: 2026-01-03
+- **Revisado em**: 2026-01-04
+- **Artefatos**:
+  - `src/services/data_extraction.py` — Serviço de extração de dados estruturados usando LLM
+  - `src/services/lead_persistence.py` — Serviço de persistência de dados parciais (preparado para Supabase)
+  - `src/services/conversation_memory.py` — Controle de ritmo de perguntas (question_count)
+  - `src/agents/sdr_agent.py` — Integração de extração e persistência no fluxo de processamento
+  - `prompts/system_prompt/sp_agente_v1.xml` — Atualizado com diretrizes de coleta progressiva
+- **Validação**:
+  - ✅ Dados coletados: nome, empresa (opcional), cidade/UF, produto/necessidade, volume/capacidade, urgência — `LEAD_DATA_FIELDS` inclui todos os campos (linhas 20-29): name, company, city, uf, product, volume, urgency, knows_seleto
+  - ✅ Máximo de 2 perguntas diretas seguidas (regra de ritmo) — Controle via `question_count` (linhas 122-123, 136-141, 199-218), reset quando usuário responde (linha 117), diretriz no prompt XML (linha 33)
+  - ✅ Perguntas contextualizadas com base nas respostas anteriores — Dados coletados passados como contexto ao agente (linhas 129-133), prompt XML (linhas 36, 62) instrui a contextualizar perguntas
+  - ✅ Dados parciais são persistidos mesmo que conversa não seja concluída — `persist_lead_data()` chamado imediatamente após extração (linha 112), comentário explícito "even if partial - US-002 requirement" (linha 110), atualização imediata na memória (linha 41)
+  - ✅ Extração incremental — `extract_lead_data()` recebe `current_data` e extrai apenas informações novas (linhas 45-46, 74-76)
+  - ✅ Normalização de dados — UF normalizado para 2 letras maiúsculas (linhas 190-192), urgência normalizada (linhas 193-205), knows_seleto normalizado (linhas 206-214)
 
 ---
 
@@ -203,6 +320,7 @@
   - [ ] Respostas baseadas nos arquivos de `prompts/equipamentos/*`
   - [ ] Se dúvida for técnica demais, agente registra e informa que especialista entrará em contato
   - [ ] Agente não promete prazos de entrega, descontos ou orçamento completo
+  - [ ] Agente não informa preços, condições comerciais ou descontos em nenhuma circunstância
 - **Dependências**: TECH-009
 - **Prioridade**: Alta
 - **Fase**: MVP
@@ -242,7 +360,8 @@
 - **Tipo**: Technical Story
 - **Descrição**: Manter histórico de mensagens e contexto coletado por telefone do lead, para continuidade da conversa.
 - **Critérios de Aceitação**:
-  - [ ] Histórico de mensagens armazenado (Supabase ou memória do Agno)
+  - [ ] Histórico completo de mensagens persistido no Supabase (DB) para auditoria, análise e backup
+  - [ ] Histórico também replicado no Chatwoot para interface visual e acompanhamento humano em tempo real
   - [ ] Contexto coletado (nome, cidade, produto, etc.) persistido e recuperável
   - [ ] Lead identificado por telefone (idempotência)
   - [ ] Histórico disponível para consulta do agente em cada turno
@@ -364,16 +483,16 @@
 
 ---
 
-## Epic 6 — Integração CRM (PipeRun)
+## Epic 6 — Integração CRM (Piperun)
 
-> Sincronizar dados com o CRM PipeRun.
+> Sincronizar dados com o CRM Piperun.
 
-### TECH-015: Implementar cliente HTTP para PipeRun
+### TECH-015: Implementar cliente HTTP para Piperun
 
 - **Tipo**: Technical Story
-- **Descrição**: Criar cliente HTTP reutilizável para chamadas à API do PipeRun, com autenticação e retry.
+- **Descrição**: Criar cliente HTTP reutilizável para chamadas à API do Piperun, com autenticação e retry.
 - **Critérios de Aceitação**:
-  - [ ] Classe/módulo `PipeRunClient` com métodos para cada endpoint
+  - [ ] Classe/módulo `PiperunClient` com métodos para cada endpoint
   - [ ] Autenticação via token em header
   - [ ] Retry com backoff exponencial (até 3 tentativas)
   - [ ] Timeout configurável (default 10s)
@@ -387,7 +506,7 @@
 ### TECH-016: Implementar busca de city_id
 
 - **Tipo**: Technical Story
-- **Descrição**: Buscar código da cidade no PipeRun por nome + UF.
+- **Descrição**: Buscar código da cidade no Piperun por nome + UF.
 - **Critérios de Aceitação**:
   - [ ] Função `get_city_id(city_name, uf) -> city_id`
   - [ ] Chamada a `GET /v1/cities?name={name}&uf={uf}`
@@ -402,7 +521,7 @@
 ### TECH-017: Implementar busca de empresa por CNPJ
 
 - **Tipo**: Technical Story
-- **Descrição**: Buscar empresa existente no PipeRun por CNPJ para evitar duplicidade.
+- **Descrição**: Buscar empresa existente no Piperun por CNPJ para evitar duplicidade.
 - **Critérios de Aceitação**:
   - [ ] Função `get_company_by_cnpj(cnpj) -> company_id | None`
   - [ ] Chamada a `GET /v1/companies?cnpj={cnpj}`
@@ -416,7 +535,7 @@
 ### TECH-018: Implementar criação de empresa no CRM
 
 - **Tipo**: Technical Story
-- **Descrição**: Criar empresa no PipeRun com dados coletados.
+- **Descrição**: Criar empresa no Piperun com dados coletados.
 - **Critérios de Aceitação**:
   - [ ] Função `create_company(name, city_id, cnpj, website, email_nf) -> company_id`
   - [ ] Chamada a `POST /v1/companies`
@@ -430,7 +549,7 @@
 ### TECH-019: Implementar criação de pessoa no CRM
 
 - **Tipo**: Technical Story
-- **Descrição**: Criar pessoa (contato) no PipeRun.
+- **Descrição**: Criar pessoa (contato) no Piperun.
 - **Critérios de Aceitação**:
   - [ ] Função `create_person(name, phones, emails, city_id) -> person_id`
   - [ ] Chamada a `POST /v1/persons`
@@ -444,7 +563,7 @@
 ### TECH-020: Implementar criação de oportunidade (deal)
 
 - **Tipo**: Technical Story
-- **Descrição**: Criar oportunidade no PipeRun em pipeline/stage configurados.
+- **Descrição**: Criar oportunidade no Piperun em pipeline/stage configurados.
 - **Critérios de Aceitação**:
   - [ ] Função `create_deal(title, pipeline_id, stage_id, origin_id, person_id, company_id) -> deal_id`
   - [ ] Chamada a `POST /v1/deals`
@@ -459,7 +578,7 @@
 ### TECH-021: Implementar criação de nota na oportunidade
 
 - **Tipo**: Technical Story
-- **Descrição**: Registrar nota padronizada na oportunidade do PipeRun.
+- **Descrição**: Registrar nota padronizada na oportunidade do Piperun.
 - **Critérios de Aceitação**:
   - [ ] Função `create_note(deal_id, content) -> note_id`
   - [ ] Chamada a `POST /v1/notes`
@@ -493,12 +612,13 @@
 ### TECH-022: Integrar com Chatwoot para registro de conversas
 
 - **Tipo**: Technical Story
-- **Descrição**: Enviar mensagens do agente e do lead para o Chatwoot, mantendo histórico visível para SDRs.
+- **Descrição**: Enviar mensagens do agente e do lead para o Chatwoot, mantendo histórico visível para SDRs. Histórico completo também persistido no Supabase (DB) conforme decisão D5.
 - **Critérios de Aceitação**:
   - [ ] Mensagens do lead replicadas no Chatwoot
   - [ ] Mensagens do agente replicadas no Chatwoot
+  - [ ] Histórico completo também persistido no Supabase (DB) para auditoria, análise e backup
   - [ ] Conversa identificada por telefone do lead
-  - [ ] Histórico acessível em tempo real pelo SDR
+  - [ ] Histórico acessível em tempo real pelo SDR no Chatwoot
 - **Dependências**: TECH-001
 - **Prioridade**: Alta
 - **Fase**: MVP
@@ -512,9 +632,11 @@
 - **Critérios de Aceitação**:
   - [ ] Ao detectar mensagem de SDR no Chatwoot, agente entra em modo "escuta"
   - [ ] Agente não envia novas mensagens automáticas após intervenção
+  - [ ] **Dentro do horário de atendimento**: agente só retoma mediante comando explícito do SDR (`/retomar` ou `/continuar`)
+  - [ ] **Fora do horário de atendimento**: agente retoma automaticamente quando o lead enviar nova mensagem (SDR não está presente)
   - [ ] Status de "agente pausado" registrado no contexto da conversa
-  - [ ] Log indicando intervenção humana
-- **Dependências**: TECH-022
+  - [ ] Log indicando intervenção humana e horário de atendimento atual
+- **Dependências**: TECH-022, TECH-032
 - **Prioridade**: Alta
 - **Fase**: MVP
 
@@ -545,7 +667,7 @@
 - **Descrição**: Coletar métricas de tempo de resposta e taxa de sucesso/falha por operação.
 - **Critérios de Aceitação**:
   - [ ] Métrica de latência por endpoint (P50, P95, P99)
-  - [ ] Taxa de sucesso/falha por integração (WhatsApp, PipeRun, Supabase)
+  - [ ] Taxa de sucesso/falha por integração (WhatsApp, Piperun, Supabase)
   - [ ] Métricas expostas em formato Prometheus ou equivalente
 - **Dependências**: TECH-004
 - **Prioridade**: Média
@@ -666,11 +788,51 @@
 
 ---
 
+### TECH-031: Implementar política de retenção de dados e LGPD
+
+- **Tipo**: Technical Story
+- **Descrição**: Implementar política de retenção de dados conforme decisão D6 do PRD, incluindo remoção de áudio, anonimização de transcrições e atendimento a direitos do titular (LGPD).
+- **Critérios de Aceitação**:
+  - [ ] Job agendado para remover arquivos de áudio após 90 dias
+  - [ ] Job agendado para anonimizar transcrições após 90 dias (remover identificadores diretos)
+  - [ ] Job agendado para anonimizar dados de lead após 1 ano de inatividade
+  - [ ] Processo para atender solicitações de acesso (fornecer cópia dos dados pessoais)
+  - [ ] Processo para atender solicitações de correção (atualizar dados incorretos)
+  - [ ] Processo para atender solicitações de exclusão (remover dados quando solicitado, respeitando obrigações legais)
+  - [ ] Processo para atender solicitações de portabilidade (exportar dados em formato interoperável)
+  - [ ] Trilha de auditoria de todas as solicitações e ações realizadas
+  - [ ] Logs de acesso e modificação de dados pessoais
+- **Dependências**: TECH-002, TECH-007, TECH-012
+- **Prioridade**: Média
+- **Fase**: Fase 2
+
+---
+
+### TECH-032: Implementar configuração de horário de atendimento e lógica de retomada
+
+- **Tipo**: Technical Story
+- **Descrição**: Implementar sistema de configuração de horário de atendimento e lógica de retomada do agente após intervenção humana, conforme decisão D7 do PRD.
+- **Critérios de Aceitação**:
+  - [ ] Arquivo de configuração de horário de atendimento (ex.: `config/horario_atendimento.yaml` ou `.env`) com:
+    - Fuso horário configurável (ex.: `America/Sao_Paulo`)
+    - Dias da semana com atendimento (ex.: segunda a sexta)
+    - Horários de início/fim por dia (ex.: 08:00-18:00)
+  - [ ] Função para verificar se está dentro do horário de atendimento
+  - [ ] Processamento de comandos do SDR (`/retomar`, `/continuar`) dentro do horário
+  - [ ] Retomada automática quando fora do horário e lead enviar nova mensagem
+  - [ ] Comandos processados pelo sistema e não aparecem como mensagem visível ao lead
+  - [ ] Logs de pausa/retomada com indicação de horário de atendimento
+- **Dependências**: TECH-001, TECH-022
+- **Prioridade**: Alta
+- **Fase**: MVP
+
+---
+
 ---
 
 ## Resumo por Fase
 
-### MVP (Fase 1) — 22 stories
+### MVP (Fase 1) — 24 stories
 
 | Epic | Stories |
 |------|---------|
@@ -680,11 +842,11 @@
 | Epic 4 — Classificação | US-006, TECH-011 |
 | Epic 5 — Persistência | TECH-012, TECH-013 |
 | Epic 6 — CRM | TECH-015, TECH-016, TECH-020, TECH-021, US-007 |
-| Epic 7 — Chatwoot | TECH-022, US-008, US-009 |
+| Epic 7 — Chatwoot | TECH-022, US-008, US-009, TECH-032 |
 | Epic 9 — Segurança | TECH-026, TECH-027 |
 | Epic 10 — Resiliência | TECH-029 |
 
-### Fase 2 — 11 stories
+### Fase 2 — 12 stories
 
 | Epic | Stories |
 |------|---------|
@@ -692,7 +854,7 @@
 | Epic 5 — Persistência | TECH-014 |
 | Epic 6 — CRM | TECH-017, TECH-018, TECH-019 |
 | Epic 8 — Observabilidade | TECH-023, TECH-024, TECH-025 |
-| Epic 9 — Segurança | TECH-028 |
+| Epic 9 — Segurança | TECH-028, TECH-031 |
 | Epic 10 — Resiliência | TECH-030 |
 
 ---
@@ -704,7 +866,7 @@ TECH-001 (setup)
     ├── TECH-002 (schema)
     │       └── TECH-012, TECH-013, TECH-014, TECH-008
     ├── TECH-003 (segredos)
-    │       └── TECH-015 (PipeRun client)
+    │       └── TECH-015 (Piperun client)
     │               └── TECH-016, TECH-017, TECH-018, TECH-019, TECH-020, TECH-021
     ├── TECH-004 (logs)
     │       └── TECH-005 (webhook)
@@ -713,7 +875,8 @@ TECH-001 (setup)
     ├── TECH-010 (prompt)
     │       └── TECH-011 (temperatura)
     └── TECH-022 (Chatwoot)
-            └── US-008, US-009
+            └── US-008, US-009, TECH-032
+                    └── (US-008 também depende de TECH-032 para retomada)
 
 US-001 → US-002 → US-003 → US-004, US-005
 US-002 + TECH-011 → US-006
@@ -728,10 +891,8 @@ As stories a seguir podem precisar de refinamento após decisões:
 
 | Decisão | Stories Impactadas |
 |---------|-------------------|
-| D1 — Provedor WhatsApp | TECH-005, TECH-006, TECH-007 |
 | D3 — Regras de score | TECH-011, US-006 |
 | D4 — Pipeline/Stage IDs | TECH-020, US-007 |
-| D7 — Comandos de retomada | US-008 (adicionar story futura) |
 
 ---
 

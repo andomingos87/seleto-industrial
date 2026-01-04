@@ -5,7 +5,7 @@
 - **Produto**: Agente de IA para atendimento inicial, qualificação e organização de CRM (Seleto Industrial)
 - **Canais**: WhatsApp (via provedor; ver “Decisões em aberto”), Chatwoot (painel humano)
 - **Orquestração/Runtime**: Agno (Agent Framework + AgentOS Runtime em Python/FastAPI)
-- **CRM**: PipeRun / Piperun (API REST)
+- **CRM**: Piperun (API REST)
 - **Persistência**: Supabase (Postgres)
 - **Artefatos-base usados**: `documentation/requirements_analysis.md`, `documentation/resume.md`, `documentation/MCP - SELETO.json`, `prompts/**`, `webhook_audio_message.json`
 - **Versão do PRD**: 1.0
@@ -70,7 +70,7 @@ Automatizar o atendimento inicial e o “SDR 0” com IA + automações, mantend
 - **Taxa de criação de oportunidade**: % conversas que geram oportunidade no CRM (quando aplicável).
 - **Taxa de intervenção humana**: % conversas assumidas por SDR (espera-se menor em leads frios).
 - **Conversão por temperatura**: quente → proposta, morno → follow-up, frio → nurture.
-- **Erros de integração**: taxa de falhas por endpoint (PipeRun/Supabase/Chatwoot/WhatsApp).
+- **Erros de integração**: taxa de falhas por endpoint (Piperun/Supabase/Chatwoot/WhatsApp).
 
 ---
 
@@ -112,7 +112,7 @@ Automatizar o atendimento inicial e o “SDR 0” com IA + automações, mantend
 - Coleta progressiva de dados do lead (sem enviar “questionário”).
 - Classificação de temperatura (frio/morno/quente).
 - Persistência mínima no banco (lead, empresa, orçamento/conversa quando aplicável).
-- Integração com PipeRun:
+- Integração com Piperun:
   - buscar cidade (city_id),
   - criar/buscar empresa (por CNPJ),
   - criar pessoa,
@@ -125,7 +125,7 @@ Automatizar o atendimento inicial e o “SDR 0” com IA + automações, mantend
 
 - **Painel web administrativo próprio** (gestão de prompts, catálogo e configurações).
 - **Notificações externas dedicadas** (e-mail/SMS/push) além do que Chatwoot/CRM já provê.
-- **Negociação comercial**: prazos, descontos, condições e proposta (salvo exceções formalmente aprovadas; ver “Política de preço”).
+- **Negociação comercial**: prazos, descontos, condições e proposta (ver "Política de preço" na seção 8.4).
 - **Precificação dinâmica** e cálculo de frete/instalação.
 - **BI/Analytics avançado** (dashboards, atribuição completa) — pode entrar em fases futuras.
 
@@ -153,21 +153,16 @@ Automatizar o atendimento inicial e o “SDR 0” com IA + automações, mantend
 - **Lead morno**: manter contexto no CRM/Chatwoot, sugerir follow-up (manual ou via processo).
 - **Lead frio**: encerrar cordialmente e oferecer material (catálogo/site); registrar no CRM quando aplicável.
 
-#### 8.4 Política de preço (decisão necessária)
+#### 8.4 Política de preço
 
-Há dois direcionamentos nos artefatos:
+**Decisão final (D2)**: Política de preço não permitida, sem exceções.
 
-- Um conjunto de regras proíbe informar preço/condições.
-- Outro documento permite exceção (lead frio) para informar preço de itens específicos.
+O agente **não deve informar preços, condições comerciais ou descontos em nenhuma circunstância**, independentemente da temperatura do lead (frio/morno/quente) ou do produto de interesse.
 
-**Requisito do PRD**: definir uma política final, com:
-
-- quais produtos permitem preço,
-- em quais condições (temperatura, intenção),
-- quais mensagens/limites (ex.: “preço de referência”, “sujeito a alteração”),
-- rastreabilidade (nota no CRM).
-
-Até decisão, considerar preço como **fora de escopo** no MVP.
+Quando o lead solicitar informações sobre preço, o agente deve:
+- Explicar cordialmente que valores e condições são personalizados conforme necessidade específica;
+- Oferecer encaminhamento para um consultor comercial que poderá fornecer orçamento detalhado;
+- Coletar informações adicionais que ajudem na preparação do orçamento (volume, urgência, especificações técnicas).
 
 #### 8.5 Regra de oferta (upsell) — formadoras
 
@@ -204,8 +199,11 @@ Até decisão, considerar preço como **fora de escopo** no MVP.
 #### 9.3 Fluxo C — Intervenção humana (Chatwoot)
 
 1) SDR envia mensagem na conversa.
-2) Agente entra em modo “escuta” e **para de responder**.
-3) Agente só volta a atuar mediante comando/condição definida (TBD).
+2) Agente entra em modo "escuta" e **para de responder**.
+3) **Retomada do agente**:
+   - **Dentro do horário de atendimento**: agente só retoma mediante comando explícito do SDR (ex.: `/retomar`, `/continuar`).
+   - **Fora do horário de atendimento**: agente retoma automaticamente quando o lead enviar nova mensagem (SDR não está presente).
+4) Horário de atendimento configurável em arquivo de configuração (fuso horário, dias da semana, horários de início/fim).
 
 #### 9.4 Fluxo D — Criação/Deduplicação de Empresa + Oportunidade no CRM
 
@@ -231,8 +229,8 @@ Objetivo: garantir que a oportunidade exista no CRM e seja vinculada corretament
 - **RF-02 — Coleta progressiva de dados**: nome, empresa (se houver), cidade/UF, produto/necessidade, volume/capacidade, urgência, histórico com a Seleto.
 - **RF-03 — Respostas com base de conhecimento**: responder dúvidas sobre equipamentos/linhas usando uma base estruturada.
 - **RF-04 — Classificação de temperatura**: classificar lead em frio/morno/quente.
-- **RF-05 — Registro e auditoria de conversa**: manter histórico acessível no Chatwoot e/ou banco.
-- **RF-06 — Escalonamento para humano**: permitir handoff e pausa do agente quando humano intervir.
+- **RF-05 — Registro e auditoria de conversa**: manter histórico completo persistido no Supabase (DB) para auditoria, análise e backup, e acessível no Chatwoot para acompanhamento humano em tempo real.
+- **RF-06 — Escalonamento para humano**: permitir handoff e pausa do agente quando humano intervir, com retomada baseada em horário de atendimento (comando explícito dentro do horário, automática fora do horário).
 
 #### 10.2 Persistência (Supabase)
 
@@ -241,7 +239,7 @@ Objetivo: garantir que a oportunidade exista no CRM e seja vinculada corretament
 - **RF-09 — Empresas no banco**: criar empresa local com nome/cidade/UF/CNPJ/site/email/telefone e vínculo com lead.
 - **RF-10 — Obter oportunidade vinculada ao lead**: recuperar `oportunidade_pipe_id` do orçamento do lead quando necessário.
 
-#### 10.3 Integração CRM (PipeRun)
+#### 10.3 Integração CRM (Piperun)
 
 - **RF-11 — Obter `city_id`**: buscar código de cidade por nome + UF.
 - **RF-12 — Criar empresa no CRM**: criar empresa com name, city_id, cnpj, website, email_nf.
@@ -260,11 +258,15 @@ Objetivo: garantir que a oportunidade exista no CRM e seja vinculada corretament
 - **RN-03 — Limite de perguntas**: máximo duas perguntas diretas seguidas.
 - **RN-04 — Idempotência por telefone**: o lead deve ser identificado pelo telefone (evitar duplicatas).
 - **RN-05 — Empresa por CNPJ**: se CNPJ informado e empresa existir no CRM, usar registro existente.
-- **RN-06 — Campos obrigatórios mínimos para “qualificado”** (MVP):
-  - nome (ou “não informado”),
-  - cidade/UF (ou “não informado”),
-  - produto/necessidade (ou “não informado”),
-  - urgência (ou “não informado”).
+- **RN-06 — Campos obrigatórios mínimos para "qualificado"** (MVP):
+  - nome (ou "não informado"),
+  - cidade/UF (ou "não informado"),
+  - produto/necessidade (ou "não informado"),
+  - urgência (ou "não informado").
+- **RN-07 — Retomada do agente após intervenção humana**:
+  - Dentro do horário de atendimento: agente só retoma mediante comando explícito do SDR (ex.: `/retomar`, `/continuar`).
+  - Fora do horário de atendimento: agente retoma automaticamente quando o lead enviar nova mensagem.
+  - Horário de atendimento configurável em arquivo de configuração (fuso horário, dias da semana, horários de início/fim por dia).
 
 ---
 
@@ -281,15 +283,113 @@ Objetivo: garantir que a oportunidade exista no CRM e seja vinculada corretament
 
 ### 13) Integrações (contratos e responsabilidades)
 
-#### 13.1 WhatsApp (provedor)
+#### 13.1 WhatsApp (Z-API)
 
-O projeto deve suportar recebimento de mensagens via webhook do provedor (existe exemplo de payload contendo áudio). Campos típicos:
+**Provedor selecionado**: Z-API (https://api.z-api.io)
 
-- **Identificação do lead**: `phone`
-- **Nome exibido**: `senderName`/`chatName`
-- **Mensagem**: texto ou objeto `audio` com `audioUrl`
+O projeto utiliza a Z-API como provedor para integração com WhatsApp, fornecendo:
+- Envio de mensagens de texto, áudio, mídia
+- Recebimento de mensagens via webhooks
+- Gerenciamento de instâncias e tokens
 
-**Decisão em aberto**: usar WhatsApp Business API oficial vs provedor terceiro (ex.: Z-API). O PRD assume apenas “provedor com webhook + envio de mensagens”.
+##### 13.1.1 Autenticação e Configuração
+
+- **Base URL**: `https://api.z-api.io`
+- **Autenticação**: Header `Client-Token` com Account Security Token
+- **Instância**: Cada instância WhatsApp possui um `INSTANCE_ID` único
+- **Token**: Token de autenticação específico da instância (`INSTANCE_TOKEN`)
+
+**Variáveis de ambiente necessárias:**
+- `ZAPI_INSTANCE_ID`: ID da instância Z-API
+- `ZAPI_INSTANCE_TOKEN`: Token da instância
+- `ZAPI_CLIENT_TOKEN`: Account Security Token (Client-Token header)
+- `ZAPI_WEBHOOK_SECRET`: Secret para validação de webhooks (opcional)
+
+##### 13.1.2 Endpoints de Envio
+
+**Envio de texto:**
+```
+POST https://api.z-api.io/instances/{INSTANCE_ID}/token/{INSTANCE_TOKEN}/send-text
+Headers:
+  Client-Token: {ZAPI_CLIENT_TOKEN}
+  Content-Type: application/json
+Body:
+  {
+    "phone": "5511999999999",
+    "message": "Texto da mensagem"
+  }
+```
+
+**Envio de áudio:**
+```
+POST https://api.z-api.io/instances/{INSTANCE_ID}/token/{INSTANCE_TOKEN}/send-message-audio
+```
+
+**Outros tipos de mídia:**
+- Imagem: `/send-message-image`
+- Vídeo: `/send-message-video`
+- Documento: `/send-message-document`
+- Localização: `/send-message-location`
+
+##### 13.1.3 Webhooks de Recebimento
+
+**Configuração do webhook:**
+```
+PUT https://api.z-api.io/instances/{INSTANCE_ID}/token/{INSTANCE_TOKEN}/update-webhook-received
+Headers:
+  Client-Token: {ZAPI_CLIENT_TOKEN}
+  Content-Type: application/json
+Body:
+  {
+    "value": "https://seu-dominio.com/webhook/whatsapp"
+  }
+```
+
+**Formato do webhook recebido:**
+```json
+{
+  "phone": "5511999999999",
+  "senderName": "Nome do Contato",
+  "message": "Texto da mensagem",
+  "messageId": "unique_message_id",
+  "messageType": "text",
+  "audio": {
+    "audioUrl": "https://...",
+    "mimeType": "audio/ogg",
+    "seconds": 5
+  }
+}
+```
+
+##### 13.1.4 Formato de Payloads
+
+**Envio (texto):**
+- `phone`: Número em formato E.164 (apenas dígitos)
+- `message`: Texto da mensagem (suporta `\n` para quebras de linha)
+
+**Recebimento (webhook):**
+- `phone`: Número do remetente
+- `senderName`: Nome exibido do contato
+- `message`: Texto (se mensagem de texto)
+- `audio`: Objeto com `audioUrl`, `mimeType`, `seconds` (se mensagem de áudio)
+- `messageId`: ID único da mensagem
+- `messageType`: Tipo da mensagem (`text`, `audio`, `image`, etc.)
+
+##### 13.1.5 Tratamento de Erros
+
+- **200 (OK)**: Requisição bem-sucedida
+- **401 (Unauthorized)**: Verificar Client-Token e credenciais
+- **404 (Not Found)**: Verificar INSTANCE_ID e INSTANCE_TOKEN
+- **405 (Method Not Allowed)**: Verificar método HTTP correto (POST/PUT)
+- **415 (Unsupported Media Type)**: Verificar header `Content-Type: application/json`
+- **429 (Rate Limit)**: Retry com backoff exponencial, respeitando header `Retry-After`
+- **5xx (Server Error)**: Retry com backoff exponencial
+
+**Limitações conhecidas:**
+- Rate limit: Consultar documentação Z-API para limites específicos por plano
+- Tamanho máximo de mensagem: 4096 caracteres
+- Formatos de áudio suportados: OGG (Opus), MP3, WAV, WEBM
+- Webhook deve ser HTTPS válido
 
 #### 13.2 Chatwoot
 
@@ -298,6 +398,10 @@ O projeto deve suportar recebimento de mensagens via webhook do provedor (existe
   - monitoramento em tempo real,
   - intervenção humana,
   - evento/condição para pausar o agente.
+- **Comandos do SDR para retomada do agente** (dentro do horário de atendimento):
+  - `/retomar` ou `/continuar`: reativa o agente para continuar atendendo automaticamente.
+  - Comandos devem ser processados pelo sistema e não aparecer como mensagem visível ao lead.
+  - Fora do horário de atendimento, o agente retoma automaticamente quando o lead enviar nova mensagem (não requer comando).
 
 #### 13.3 Agno (Agent Framework + AgentOS Runtime)
 
@@ -306,8 +410,13 @@ O projeto deve suportar recebimento de mensagens via webhook do provedor (existe
 - Executa o agente com:
   - prompt do sistema (`sp_agente_v1.xml`),
   - memória/histórico de conversa,
-  - ferramentas (tools) para Supabase e PipeRun,
-  - guardrails e Human-in-the-Loop (pausa/retomada sob regras).
+  - ferramentas (tools) para Supabase e Piperun,
+  - guardrails e Human-in-the-Loop (pausa/retomada sob regras baseadas em horário de atendimento).
+- **Configuração de horário de atendimento**: arquivo de configuração (ex.: `config/horario_atendimento.yaml` ou `.env`) contendo:
+  - fuso horário (ex.: `America/Sao_Paulo`),
+  - dias da semana com atendimento (ex.: segunda a sexta),
+  - horários de início/fim por dia (ex.: 08:00-18:00),
+  - permitindo fácil alteração sem recompilação.
 - Publica endpoints para ingestão e operações (ex.: webhook mensagem, webhook status, webhook áudio) conforme o provedor utilizado.
 - Observabilidade: logs estruturados, tracing e métricas (com ou sem uso do Control Plane/UI do Agno, se adotado).
 
@@ -324,7 +433,7 @@ Tabelas mínimas já observadas nos fluxos:
 - Ativar **Row Level Security (RLS)** nas tabelas e usar **Service Key** (somente servidor) para automações administrativas, evitando exposição em clientes.
 - Alternativa: criar role Postgres com `BYPASSRLS` apenas para rotinas internas, com auditoria e rotação.
 
-#### 13.5 PipeRun / Piperun (CRM)
+#### 13.5 Piperun (CRM)
 
 Endpoints observados nos artefatos (sem segredos):
 
@@ -361,16 +470,36 @@ Configurações do CRM devem ser parametrizadas:
 - **E-mail**: validar formato e armazenar lowercased.
 - **Cidade/UF**: UF com 2 letras; cidade como texto livre + mapeamento para `city_id`.
 
-#### 14.2 Retenção e LGPD (recomendação)
+#### 14.2 Retenção e LGPD (política adotada — D6)
 
-- Definir prazo de retenção para:
-  - mensagens/transcrições,
-  - dados de lead,
-  - logs técnicos.
-- Implementar processo de:
-  - anonimização/remoção sob solicitação,
-  - minimização de dados (coletar apenas o necessário),
-  - controle de acesso e trilhas de auditoria.
+**Política de retenção:**
+
+- **Áudio/transcrição**: retenção de **90 dias**, após os quais:
+  - arquivos de áudio serão removidos permanentemente;
+  - transcrições serão anonimizadas (mantendo apenas texto sem identificadores diretos como nome, telefone, CNPJ).
+- **Dados de lead**: retenção de **2 anos**, com anonimização após período de inatividade de **1 ano**.
+- **Logs técnicos**: retenção de **30 dias** para logs de aplicação, **90 dias** para logs de auditoria de integrações.
+
+**Consentimento:**
+- Consentimento **implícito** no uso do serviço via WhatsApp (cliente inicia contato voluntariamente).
+- Informar ao lead, quando apropriado, que a conversa será registrada para melhor atendimento.
+
+**Minimização de dados:**
+- Coletar apenas dados necessários para qualificação e atendimento.
+- Não armazenar dados sensíveis além do necessário (ex.: não armazenar CPF a menos que seja estritamente necessário).
+
+**Direitos do titular (LGPD):**
+- Implementar processo para atendimento de solicitações de:
+  - **Acesso**: fornecer cópia dos dados pessoais em formato estruturado.
+  - **Correção**: atualizar dados incorretos ou incompletos.
+  - **Exclusão**: remover dados pessoais quando solicitado (respeitando obrigações legais de retenção).
+  - **Portabilidade**: exportar dados em formato interoperável quando aplicável.
+- Manter trilha de auditoria de todas as solicitações e ações realizadas.
+
+**Controles de acesso:**
+- Implementar controle de acesso baseado em roles para dados pessoais.
+- Logs de acesso e modificação de dados pessoais.
+- Criptografia de dados sensíveis em repouso e em trânsito.
 
 #### 14.3 Dicionário de dados sugerido (MVP)
 
@@ -434,7 +563,7 @@ Observação: o schema real pode variar, mas os dados abaixo precisam existir pa
 - **R4 — Provedor WhatsApp**: mudanças ou limitações (áudio, rate limit).
   - Mitigação: adaptar camada de ingestão; desacoplar via serviço Agno (AgentOS Runtime).
 - **R5 — Intervenção humana**: conflito agente vs SDR.
-  - Mitigação: regra rígida de pausa e comandos de retomada.
+  - Mitigação: regra rígida de pausa e retomada baseada em horário de atendimento (comando explícito dentro do horário, automática fora do horário).
 
 ---
 
@@ -466,10 +595,10 @@ Observação: o schema real pode variar, mas os dados abaixo precisam existir pa
 ### 18) Critérios de aceite (alto nível)
 
 - **CA-01**: Ao receber mensagem (texto), o agente responde e conduz coleta com no máximo duas perguntas seguidas.
-- **CA-02**: O sistema registra nome/telefone (quando fornecidos) e mantém histórico acessível no Chatwoot.
+- **CA-02**: O sistema registra nome/telefone (quando fornecidos) e mantém histórico completo persistido no Supabase e acessível no Chatwoot.
 - **CA-03**: O lead é classificado (frio/morno/quente) e a classificação é persistida/registrada conforme arquitetura definida.
-- **CA-04**: Para leads qualificados para CRM, o sistema cria oportunidade no PipeRun e adiciona nota com template padronizado.
-- **CA-05**: Se o SDR humano enviar mensagem, o agente pausa e não envia novas mensagens automaticamente.
+- **CA-04**: Para leads qualificados para CRM, o sistema cria oportunidade no Piperun e adiciona nota com template padronizado.
+- **CA-05**: Se o SDR humano enviar mensagem, o agente pausa. Dentro do horário de atendimento, o agente só retoma mediante comando explícito do SDR. Fora do horário de atendimento, o agente retoma automaticamente quando o lead enviar nova mensagem.
 - **CA-06**: Em falhas temporárias de CRM, há retry/backoff e logs suficientes para auditoria.
 - **CA-07**: Nenhum segredo (token/chave) fica hardcoded em arquivos versionados.
 
@@ -477,14 +606,14 @@ Observação: o schema real pode variar, mas os dados abaixo precisam existir pa
 
 ### 19) Decisões em aberto (TBD)
 
-- **D1**: Provedor WhatsApp: API oficial vs terceiro (ex.: Z-API). Requisitos de conformidade e limitações.
-- **D2**: Política final de preço (permitido ou não; exceções).
+- **D1**: ~~Provedor WhatsApp: API oficial vs terceiro (ex.: Z-API). Requisitos de conformidade e limitações.~~ **RESOLVIDO**: Z-API selecionado como provedor. Ver seção 13.1 para especificações técnicas completas.
+- **D2**: ~~Política final de preço: não permitido, sem exceções.~~ **RESOLVIDO**: Política de preço não permitida, sem exceções. O agente não deve informar preços, condições comerciais ou descontos em nenhuma circunstância.
 - **D3**: Regras completas de score (temperatura) incorporando fit/volume/urgência (não apenas engajamento).
-- **D4**: Quais etapas do funil e IDs corretos (pipeline/stage) no PipeRun.
-- **D5**: Estratégia de persistência do histórico (Chatwoot apenas vs DB + Chatwoot).
-- **D6**: Retenção de áudio/transcrição e política LGPD (prazo, consentimento, minimização).
-- **D7**: Comandos de retomada do agente após intervenção humana.
-- **D8**: CRM alvo final (PipeRun/Piperun vs Pipedrive) — materiais citam ambos, mas integrações atuais estão em PipeRun.
+- **D4**: Quais etapas do funil e IDs corretos (pipeline/stage) no Piperun.
+- **D5**: ~~Estratégia de persistência do histórico (Chatwoot apenas vs DB + Chatwoot).~~ **RESOLVIDO**: DB + Chatwoot. O histórico completo será persistido no Supabase (DB) para auditoria, análise e backup, enquanto o Chatwoot mantém a interface visual para acompanhamento humano em tempo real.
+- **D6**: ~~Retenção de áudio/transcrição e política LGPD (prazo, consentimento, minimização).~~ **RESOLVIDO**: Recomendação adotada: (a) **Áudio/transcrição**: retenção de 90 dias, após os quais arquivos de áudio serão removidos e transcrições anonimizadas (mantendo apenas texto sem identificadores diretos); (b) **Dados de lead**: retenção de 2 anos, com anonimização após período de inatividade de 1 ano; (c) **Consentimento**: implícito no uso do serviço via WhatsApp (cliente inicia contato voluntariamente); (d) **Minimização**: coletar apenas dados necessários para qualificação e atendimento; (e) **Direitos do titular**: implementar processo para atendimento de solicitações de acesso, correção, exclusão e portabilidade conforme LGPD.
+- **D7**: ~~Comandos de retomada do agente após intervenção humana.~~ **RESOLVIDO**: Retomada baseada em horário de atendimento. **Dentro do horário de atendimento**: agente só retoma mediante comando explícito do SDR (ex.: `/retomar`, `/continuar`). **Fora do horário de atendimento**: agente retoma automaticamente quando o lead enviar nova mensagem (SDR não está presente). O horário de atendimento deve ser configurável em arquivo de configuração (fuso horário, dias da semana, horários de início/fim por dia) para fácil alteração.
+- **D8**: ~~CRM alvo final (PipeRun/Piperun vs Pipedrive) — materiais citam ambos, mas integrações atuais estão em PipeRun.~~ **RESOLVIDO**: Piperun confirmado como CRM alvo final. Todas as integrações devem utilizar a API do Piperun.
 
 ---
 
@@ -543,28 +672,40 @@ Se um campo não for informado, preencher com “Não informado”.
   - Já conhece a Seleto Industrial?:
   - Observações adicionais:
 
-#### 20.5 Exemplo (redigido) de payload de webhook com áudio
+#### 20.5 Exemplo (redigido) de payload de webhook com áudio (Z-API)
 
 O formato abaixo é apenas ilustrativo e não deve conter tokens/segredos em documentação pública.
 
+**Formato do webhook recebido pela Z-API:**
+
 ```json
 {
-  "headers": {
-    "origin": "https://api.<provedor>",
-    "content-type": "application/json",
-    "token": "<redacted>"
-  },
-  "body": {
-    "phone": "5511XXXXXXXXX",
-    "senderName": "Nome",
-    "type": "ReceivedCallback",
-    "audio": {
-      "audioUrl": "https://.../arquivo.ogg",
-      "mimeType": "audio/ogg; codecs=opus",
-      "seconds": 2
-    }
+  "phone": "5511999999999",
+  "senderName": "Nome do Contato",
+  "message": null,
+  "messageId": "unique_message_id_12345",
+  "messageType": "audio",
+  "audio": {
+    "audioUrl": "https://api.z-api.io/storage/audio/arquivo.ogg",
+    "mimeType": "audio/ogg; codecs=opus",
+    "seconds": 5
   }
 }
 ```
+
+**Formato do webhook recebido para mensagem de texto:**
+
+```json
+{
+  "phone": "5511999999999",
+  "senderName": "Nome do Contato",
+  "message": "Olá, gostaria de informações sobre formadoras",
+  "messageId": "unique_message_id_67890",
+  "messageType": "text",
+  "audio": null
+}
+```
+
+**Nota**: A Z-API envia o payload diretamente no body da requisição POST, sem wrapper de headers. O webhook deve ser configurado via API (ver seção 13.1.3).
 
 

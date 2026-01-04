@@ -9,23 +9,15 @@ from agno.os import AgentOS
 from src.api.middleware.logging import LoggingMiddleware
 from src.api.routes.health import router as health_router
 from src.api.routes.webhook import router as webhook_router
+from src.agents.sdr_agent import create_sdr_agent
 from src.config.settings import settings
 from src.utils.logging import get_logger
 
 # Initialize logger
 logger = get_logger(__name__)
 
-# Placeholder agent (será expandido em TECH-009/TECH-010)
-sdr_agent = Agent(
-    name="Seleto SDR",
-    model=OpenAIChat(id=settings.OPENAI_MODEL),
-    description="Agente de qualificação de leads para Seleto Industrial",
-    instructions=[
-        "Você é um assistente de vendas da Seleto Industrial.",
-        "Sua função é qualificar leads e coletar informações relevantes.",
-    ],
-    markdown=True,
-)
+# Create SDR agent with system prompt (TECH-010)
+sdr_agent = create_sdr_agent()
 
 # AgentOS com FastAPI
 agent_os = AgentOS(

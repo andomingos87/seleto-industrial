@@ -1,1 +1,1 @@
-Não execute nem altere nada no código.
+Me responda aqui no chat, não modifique nada no projeto nem execute nada.

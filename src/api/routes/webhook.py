@@ -9,8 +9,10 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
+from src.agents.sdr_agent import process_message
 from src.config.settings import settings
 from src.services.transcription import transcribe_audio
+from src.services.whatsapp import send_whatsapp_message
 from src.utils.logging import (
     get_logger,
     log_webhook_received,
@@ -131,8 +133,43 @@ async def process_text_message(payload: WhatsAppWebhookPayload) -> dict:
         },
     )
 
-    # TODO: Process message with agent (will be implemented in Epic 3)
-    # For now, just log and return success
+    # Process message with agent (US-001)
+    try:
+        response_text = await process_message(
+            phone=normalized_phone,
+            message=payload.message or "",
+            sender_name=payload.senderName,
+        )
+
+        # Send response via WhatsApp
+        if response_text:
+            success = await send_whatsapp_message(normalized_phone, response_text)
+            if not success:
+                logger.error(
+                    "Failed to send WhatsApp response",
+                    extra={"phone": normalized_phone},
+                )
+        else:
+            logger.warning(
+                "Empty response from agent, not sending",
+                extra={"phone": normalized_phone},
+            )
+
+    except Exception as e:
+        logger.error(
+            "Error processing message with agent",
+            extra={
+                "phone": normalized_phone,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+        # Send fallback message
+        fallback_message = (
+            "Olá! Seja bem-vindo à Seleto Industrial 👋\n"
+            "Desculpe, tive um problema técnico. Pode repetir sua mensagem?"
+        )
+        await send_whatsapp_message(normalized_phone, fallback_message)
 
     return {
         "status": "processed",
@@ -230,8 +267,43 @@ async def process_audio_message(payload: WhatsAppWebhookPayload) -> dict:
         },
     )
 
-    # TODO: Process transcribed text with agent (will be implemented in Epic 3)
-    # For now, return the transcribed text
+    # Process transcribed text with agent (US-001)
+    try:
+        response_text = await process_message(
+            phone=normalized_phone,
+            message=transcribed_text,
+            sender_name=payload.senderName,
+        )
+
+        # Send response via WhatsApp
+        if response_text:
+            success = await send_whatsapp_message(normalized_phone, response_text)
+            if not success:
+                logger.error(
+                    "Failed to send WhatsApp response",
+                    extra={"phone": normalized_phone},
+                )
+        else:
+            logger.warning(
+                "Empty response from agent, not sending",
+                extra={"phone": normalized_phone},
+            )
+
+    except Exception as e:
+        logger.error(
+            "Error processing transcribed message with agent",
+            extra={
+                "phone": normalized_phone,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+        # Send fallback message
+        fallback_message = (
+            "Olá! Seja bem-vindo à Seleto Industrial 👋\n"
+            "Desculpe, tive um problema técnico. Pode repetir sua mensagem?"
+        )
+        await send_whatsapp_message(normalized_phone, fallback_message)
 
     return {
         "status": "processed",

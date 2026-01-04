@@ -1,0 +1,1 @@
+Valide as tarefas verificando se foram implementadas corretamente. Se sim, atualize o documento marcando-as como finalizadas e a data da revisão.
