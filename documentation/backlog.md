@@ -533,6 +533,25 @@
 
 > Salvar e recuperar dados de leads, orçamentos e empresas.
 
+**Status do Epic:** 🟡 Em Progresso (Stage 1 concluído)
+
+**Progresso:**
+- ✅ Stage 1: Discovery & Setup (2026-01-XX)
+  - ✅ Schema Supabase validado (leads, orcamentos, empresa)
+  - ✅ Código existente revisado (conversation_persistence, validation, lead_persistence)
+  - ✅ Estrutura de testes criada (test_lead_crud, test_orcamento_crud, test_empresa_crud)
+- ⏳ Stage 2: TECH-012 - CRUD de Leads (próximo)
+- ⏳ Stage 3: TECH-013 - CRUD de Orçamentos
+- ⏳ Stage 4: TECH-014 - CRUD de Empresas
+- ⏳ Stage 5: Validação, Testes e Documentação
+
+**Notas do Stage 1:**
+- Schema validado: `leads.phone` tem constraint UNIQUE ✅
+- Schema validado: `empresa.cnpj` NÃO tem constraint UNIQUE ⚠️ (dedupe via lógica de aplicação)
+- Código reutilizável identificado: `get_supabase_client()`, `normalize_phone()`, `normalize_cnpj()`
+- Estrutura de testes criada seguindo padrão de `test_conversation_persistence.py`
+- Ver plan detalhado: `.context/plans/epic-5-persistencia-local-supabase.md`
+
 ### TECH-012: Implementar CRUD de leads
 
 - **Tipo**: Technical Story
