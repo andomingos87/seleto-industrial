@@ -2,9 +2,13 @@
 Testes de integração para fluxo completo de conversa.
 
 Execute com: pytest tests/test_integration_flow.py -v -s
+
+Para usar servidor de produção (fly.io):
+    INTEGRATION_TEST_URL=https://seleto-industrial.fly.dev pytest tests/test_integration_flow.py -v -s
 """
 
 import asyncio
+import os
 from typing import Dict, Any
 
 import httpx
@@ -14,32 +18,41 @@ from src.services.conversation_memory import conversation_memory
 from src.services.data_extraction import extract_lead_data
 from src.utils.validation import normalize_phone, validate_phone
 
+# URL base para testes de integração (padrão: fly.io produção)
+INTEGRATION_BASE_URL = os.environ.get(
+    "INTEGRATION_TEST_URL", "https://seleto-industrial.fly.dev"
+)
+
 
 @pytest.mark.asyncio
 async def test_health_endpoint():
     """Testa endpoint de health check."""
-    async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+    async with httpx.AsyncClient(base_url=INTEGRATION_BASE_URL) as client:
         response = await client.get("/api/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
         assert "timestamp" in data
         assert data["service"] == "seleto-sdr-agent"
-        print("✅ Health endpoint funcionando")
+        print(f"✅ Health endpoint funcionando ({INTEGRATION_BASE_URL})")
 
 
 @pytest.mark.asyncio
 async def test_webhook_text_message():
     """Testa recebimento de mensagem de texto via webhook."""
-    async with httpx.AsyncClient(base_url="http://localhost:8000", timeout=30.0) as client:
+    async with httpx.AsyncClient(base_url=INTEGRATION_BASE_URL, timeout=30.0) as client:
+        # Z-API payload format: text message content is nested in 'text.message'
         payload = {
             "phone": "5511999999999",
             "senderName": "Teste Lead",
-            "message": "Olá, preciso de uma formadora de hambúrguer",
+            "text": {
+                "message": "Olá, preciso de uma formadora de hambúrguer"
+            },
             "messageId": "test-webhook-001",
-            "messageType": "text",
+            "type": "ReceivedCallback",
+            "fromMe": False,
         }
-        
+
         response = await client.post("/webhook/whatsapp", json=payload)
         assert response.status_code == 200
         response_data = response.json()
@@ -126,37 +139,41 @@ def test_conversation_memory():
 @pytest.mark.asyncio
 async def test_full_conversation_flow():
     """Testa fluxo completo de conversa (requer servidor rodando)."""
-    base_url = "http://localhost:8000"
-    
     try:
-        async with httpx.AsyncClient(base_url=base_url, timeout=30.0) as client:
+        async with httpx.AsyncClient(base_url=INTEGRATION_BASE_URL, timeout=30.0) as client:
             # 1. Health check
             health = await client.get("/api/health")
             assert health.status_code == 200
             print("\n✅ 1. Health check OK")
             
-            # 2. Primeira mensagem
+            # 2. Primeira mensagem (Z-API format with nested text.message)
             payload1 = {
                 "phone": "5511888888888",
                 "senderName": "Lead Teste",
-                "message": "Olá, preciso de uma formadora de hambúrguer",
+                "text": {
+                    "message": "Olá, preciso de uma formadora de hambúrguer"
+                },
                 "messageId": "flow-test-001",
-                "messageType": "text",
+                "type": "ReceivedCallback",
+                "fromMe": False,
             }
             response1 = await client.post("/webhook/whatsapp", json=payload1)
             assert response1.status_code == 200
             print("✅ 2. Primeira mensagem processada")
-            
+
             # Aguardar um pouco para processamento assíncrono
             await asyncio.sleep(2)
-            
+
             # 3. Segunda mensagem (fornecendo mais dados)
             payload2 = {
                 "phone": "5511888888888",
                 "senderName": "Lead Teste",
-                "message": "Sou Maria Santos, de Campinas, SP. Preciso processar uns 500 hambúrgueres por dia",
+                "text": {
+                    "message": "Sou Maria Santos, de Campinas, SP. Preciso processar uns 500 hambúrgueres por dia"
+                },
                 "messageId": "flow-test-002",
-                "messageType": "text",
+                "type": "ReceivedCallback",
+                "fromMe": False,
             }
             response2 = await client.post("/webhook/whatsapp", json=payload2)
             assert response2.status_code == 200
@@ -167,7 +184,7 @@ async def test_full_conversation_flow():
             print("\n✅ Fluxo completo testado com sucesso!")
             
     except httpx.ConnectError:
-        pytest.skip("Servidor não está rodando. Execute: uvicorn src.main:app --reload")
+        pytest.skip(f"Servidor não acessível em {INTEGRATION_BASE_URL}")
 
 
 if __name__ == "__main__":

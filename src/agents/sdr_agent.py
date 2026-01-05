@@ -6,6 +6,7 @@ conversation memory, response generation, and knowledge base integration (US-003
 """
 
 import asyncio
+import json
 import time
 from typing import Optional
 
@@ -29,6 +30,27 @@ from src.services.temperature_classification import classify_lead, should_classi
 from src.utils.logging import get_logger, set_phone
 
 logger = get_logger(__name__)
+
+# #region debug instrumentation
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = None):
+    """Write debug log in NDJSON format."""
+    try:
+        import os
+        log_path = r"c:\Users\Anderson Domingos\Documents\Projetos\seleto_industrial\.cursor\debug.log"
+        log_entry = {
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000)
+        }
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception:
+        pass  # Fail silently to not break production
+# #endregion
 
 # System prompt loaded at module level (cached for performance)
 # Cache is cleared on process restart, allowing prompt changes to take effect
@@ -307,6 +329,10 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
 
     # Generate response using the agent
     try:
+        # #region debug instrumentation
+        _debug_log("sdr_agent.py:309", "BEFORE agent.run", {"phone": normalized_phone, "has_openai_key": bool(settings.OPENAI_API_KEY), "message_preview": full_message[:100]}, "B")
+        # #endregion
+        
         # Use the agent's run method
         # For Agno, we use run() which handles the conversation
         # The run() method expects 'input' as the first positional argument
@@ -330,6 +356,10 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
             else:
                 raise
 
+        # #region debug instrumentation
+        _debug_log("sdr_agent.py:332", "AFTER agent.run", {"phone": normalized_phone, "response_type": type(response).__name__, "has_content": hasattr(response, "content"), "has_messages": hasattr(response, "messages")}, "B")
+        # #endregion
+
         # Extract response text
         response_text = ""
         if hasattr(response, "content"):
@@ -346,6 +376,10 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
         else:
             # Try to get text from response object
             response_text = str(response)
+
+        # #region debug instrumentation
+        _debug_log("sdr_agent.py:351", "EXTRACTED response_text", {"phone": normalized_phone, "response_length": len(response_text) if response_text else 0, "is_empty": not response_text or not response_text.strip()}, "B")
+        # #endregion
 
         # Ensure response is not empty
         if not response_text or not response_text.strip():

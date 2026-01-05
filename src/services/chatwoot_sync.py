@@ -73,7 +73,16 @@ async def create_chatwoot_conversation(phone: str, sender_name: Optional[str] = 
             )
 
             if list_response.status_code == 200:
-                conversations = list_response.json()
+                response_data = list_response.json()
+                # Chatwoot API returns paginated response: {data: {...}, meta: {...}}
+                # Support both formats for defensive coding
+                if isinstance(response_data, list):
+                    conversations = response_data
+                elif isinstance(response_data, dict):
+                    conversations = response_data.get("data", response_data.get("payload", []))
+                else:
+                    conversations = []
+
                 if conversations and len(conversations) > 0:
                     # Use existing conversation
                     conversation_id = str(conversations[0]["id"])
@@ -154,7 +163,16 @@ async def _get_or_create_chatwoot_contact(phone: str, sender_name: Optional[str]
             )
 
             if search_response.status_code == 200:
-                contacts = search_response.json()
+                response_data = search_response.json()
+                # Chatwoot API returns paginated response: {payload: [...], meta: {...}}
+                # Support both formats for defensive coding
+                if isinstance(response_data, list):
+                    contacts = response_data
+                elif isinstance(response_data, dict):
+                    contacts = response_data.get("payload", [])
+                else:
+                    contacts = []
+
                 if contacts and len(contacts) > 0:
                     # Use existing contact
                     contact_id = contacts[0].get("id")

@@ -3,6 +3,7 @@ WhatsApp service for sending and receiving messages.
 """
 
 import asyncio
+import json
 import time
 from typing import Optional
 
@@ -12,6 +13,27 @@ from src.utils.logging import get_logger, log_api_call, set_phone
 from src.utils.validation import normalize_phone
 
 logger = get_logger(__name__)
+
+# #region debug instrumentation
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = None):
+    """Write debug log in NDJSON format."""
+    try:
+        import os
+        log_path = r"c:\Users\Anderson Domingos\Documents\Projetos\seleto_industrial\.cursor\debug.log"
+        log_entry = {
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000)
+        }
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception:
+        pass  # Fail silently to not break production
+# #endregion
 
 
 class WhatsAppService:
@@ -57,6 +79,10 @@ class WhatsAppService:
         Raises:
             ValueError: If Z-API is not configured
         """
+        # #region debug instrumentation
+        _debug_log("whatsapp.py:38", "send_message ENTRY", {"phone": phone, "text_length": len(text), "api_url": self.api_url}, "D")
+        # #endregion
+        
         if not self.is_configured():
             missing = []
             if not self.instance_id:
@@ -65,6 +91,9 @@ class WhatsAppService:
                 missing.append("ZAPI_INSTANCE_TOKEN")
             if not self.client_token:
                 missing.append("ZAPI_CLIENT_TOKEN")
+            # #region debug instrumentation
+            _debug_log("whatsapp.py:60", "Z-API NOT CONFIGURED", {"missing": missing}, "A")
+            # #endregion
             raise ValueError(
                 f"Z-API service not configured. Missing: {', '.join(missing)}"
             )
@@ -92,6 +121,10 @@ class WhatsAppService:
         last_error: Optional[Exception] = None
         for attempt in range(max_retries):
             try:
+                # #region debug instrumentation
+                _debug_log("whatsapp.py:98", "BEFORE HTTP POST", {"phone": normalized_phone, "attempt": attempt + 1, "url": f"{self.api_url}/send-text"}, "D")
+                # #endregion
+                
                 start_time = time.perf_counter()
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
                     # Z-API endpoint for sending text messages
@@ -102,6 +135,10 @@ class WhatsAppService:
                     )
 
                     duration_ms = (time.perf_counter() - start_time) * 1000
+
+                    # #region debug instrumentation
+                    _debug_log("whatsapp.py:103", "AFTER HTTP POST", {"phone": normalized_phone, "status_code": response.status_code, "attempt": attempt + 1}, "D")
+                    # #endregion
 
                     # Check for rate limiting (429)
                     if response.status_code == 429:
@@ -132,6 +169,9 @@ class WhatsAppService:
 
                     # Success
                     if response.status_code in (200, 201):
+                        # #region debug instrumentation
+                        _debug_log("whatsapp.py:134", "SUCCESS - message sent", {"phone": normalized_phone, "status_code": response.status_code, "attempt": attempt + 1}, "D")
+                        # #endregion
                         logger.info(
                             "Z-API message sent successfully",
                             extra={
@@ -150,6 +190,10 @@ class WhatsAppService:
                             error_msg = error_data.get("error", error_msg)
                         except Exception:
                             pass
+
+                        # #region debug instrumentation
+                        _debug_log("whatsapp.py:146", "CLIENT ERROR (4xx)", {"phone": normalized_phone, "status_code": response.status_code, "error_msg": error_msg, "attempt": attempt + 1}, "D")
+                        # #endregion
 
                         logger.error(
                             f"Z-API message send failed: {error_msg}",
@@ -178,6 +222,9 @@ class WhatsAppService:
 
             except httpx.TimeoutException as e:
                 last_error = e
+                # #region debug instrumentation
+                _debug_log("whatsapp.py:179", "TIMEOUT EXCEPTION", {"phone": normalized_phone, "attempt": attempt + 1, "error": str(e)}, "D")
+                # #endregion
                 if attempt < max_retries - 1:
                     backoff = initial_backoff * (2**attempt)
                     logger.warning(
@@ -193,6 +240,9 @@ class WhatsAppService:
 
             except httpx.RequestError as e:
                 last_error = e
+                # #region debug instrumentation
+                _debug_log("whatsapp.py:194", "REQUEST ERROR", {"phone": normalized_phone, "attempt": attempt + 1, "error": str(e)}, "D")
+                # #endregion
                 if attempt < max_retries - 1:
                     backoff = initial_backoff * (2**attempt)
                     logger.warning(
@@ -209,6 +259,9 @@ class WhatsAppService:
 
             except Exception as e:
                 last_error = e
+                # #region debug instrumentation
+                _debug_log("whatsapp.py:210", "UNEXPECTED EXCEPTION", {"phone": normalized_phone, "attempt": attempt + 1, "error": str(e), "error_type": type(e).__name__}, "D")
+                # #endregion
                 logger.error(
                     "Unexpected error sending Z-API message",
                     extra={
@@ -224,6 +277,9 @@ class WhatsAppService:
                     continue
 
         # All retries exhausted
+        # #region debug instrumentation
+        _debug_log("whatsapp.py:226", "ALL RETRIES EXHAUSTED", {"phone": normalized_phone, "max_retries": max_retries, "last_error": str(last_error) if last_error else None}, "D")
+        # #endregion
         logger.error(
             f"Z-API message send failed after {max_retries} attempts",
             extra={
