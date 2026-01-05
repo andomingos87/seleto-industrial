@@ -8,7 +8,13 @@
       "Bash(./venv/Scripts/python -m pytest tests/services/test_knowledge_base.py -v --tb=short)",
       "Bash(./venv/Scripts/python -m pytest tests/agents/test_sdr_agent_knowledge.py -v --tb=short)",
       "Bash(./venv/Scripts/python:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -m pytest \"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\tests\" -v --tb=short)",
+      "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -m pytest:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
