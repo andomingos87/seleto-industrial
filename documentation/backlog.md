@@ -731,132 +731,169 @@
 
 ---
 
-## Epic 6 — Integração CRM (Piperun)
+## Epic 6 — Integração CRM (Piperun) ✅
 
 > Sincronizar dados com o CRM Piperun.
 
-### TECH-015: Implementar cliente HTTP para Piperun
+### TECH-015: Implementar cliente HTTP para Piperun ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar cliente HTTP reutilizável para chamadas à API do Piperun, com autenticação e retry.
 - **Critérios de Aceitação**:
-  - [ ] Classe/módulo `PiperunClient` com métodos para cada endpoint
-  - [ ] Autenticação via token em header
-  - [ ] Retry com backoff exponencial (até 3 tentativas)
-  - [ ] Timeout configurável (default 10s)
-  - [ ] Logs de request/response (sem expor tokens)
+  - [x] Classe/módulo `PiperunClient` com métodos para cada endpoint
+  - [x] Autenticação via token em header
+  - [x] Retry com backoff exponencial (até 3 tentativas)
+  - [x] Timeout configurável (default 10s)
+  - [x] Logs de request/response (sem expor tokens)
 - **Dependências**: TECH-003
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-05)
+- **Artefatos**:
+  - `src/services/piperun_client.py` — Classe `PiperunClient` com todos os métodos
+  - `tests/services/test_piperun_client.py` — 51 testes unitários
 
 ---
 
-### TECH-016: Implementar busca de city_id
+### TECH-016: Implementar busca de city_id ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Buscar código da cidade no Piperun por nome + UF.
 - **Critérios de Aceitação**:
-  - [ ] Função `get_city_id(city_name, uf) -> city_id`
-  - [ ] Chamada a `GET /v1/cities?name={name}&uf={uf}`
-  - [ ] Retorna None se cidade não encontrada
-  - [ ] Cache opcional para evitar chamadas repetidas
+  - [x] Função `get_city_id(city_name, uf) -> city_id`
+  - [x] Chamada a `GET /v1/cities?name={name}&uf={uf}`
+  - [x] Retorna None se cidade não encontrada
+  - [x] Cache opcional para evitar chamadas repetidas
 - **Dependências**: TECH-015
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-05)
+- **Artefatos**:
+  - `src/services/piperun_client.py:get_city_id()` — Implementação com cache
 
 ---
 
-### TECH-017: Implementar busca de empresa por CNPJ
+### TECH-017: Implementar busca de empresa por CNPJ ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Buscar empresa existente no Piperun por CNPJ para evitar duplicidade.
 - **Critérios de Aceitação**:
-  - [ ] Função `get_company_by_cnpj(cnpj) -> company_id | None`
-  - [ ] Chamada a `GET /v1/companies?cnpj={cnpj}`
-  - [ ] CNPJ normalizado antes da busca
+  - [x] Função `get_company_by_cnpj(cnpj) -> company_id | None`
+  - [x] Chamada a `GET /v1/companies?cnpj={cnpj}`
+  - [x] CNPJ normalizado antes da busca
 - **Dependências**: TECH-015
 - **Prioridade**: Média
 - **Fase**: Fase 2
+- **Status**: ✅ Concluído (2026-01-05)
+- **Artefatos**:
+  - `src/services/piperun_client.py:get_company_by_cnpj()` — Implementação com normalização
 
 ---
 
-### TECH-018: Implementar criação de empresa no CRM
+### TECH-018: Implementar criação de empresa no CRM ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar empresa no Piperun com dados coletados.
 - **Critérios de Aceitação**:
-  - [ ] Função `create_company(name, city_id, cnpj, website, email_nf) -> company_id`
-  - [ ] Chamada a `POST /v1/companies`
-  - [ ] Retorna ID da empresa criada
+  - [x] Função `create_company(name, city_id, cnpj, website, email_nf) -> company_id`
+  - [x] Chamada a `POST /v1/companies`
+  - [x] Retorna ID da empresa criada
 - **Dependências**: TECH-015, TECH-016
 - **Prioridade**: Média
 - **Fase**: Fase 2
+- **Status**: ✅ Concluído (2026-01-05)
+- **Artefatos**:
+  - `src/services/piperun_client.py:create_company()` — Implementação com validação
 
 ---
 
-### TECH-019: Implementar criação de pessoa no CRM
+### TECH-019: Implementar criação de pessoa no CRM ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar pessoa (contato) no Piperun.
 - **Critérios de Aceitação**:
-  - [ ] Função `create_person(name, phones, emails, city_id) -> person_id`
-  - [ ] Chamada a `POST /v1/persons`
-  - [ ] Telefones e e-mails como arrays
+  - [x] Função `create_person(name, phones, emails, city_id) -> person_id`
+  - [x] Chamada a `POST /v1/persons`
+  - [x] Telefones e e-mails como arrays
 - **Dependências**: TECH-015, TECH-016
 - **Prioridade**: Média
 - **Fase**: Fase 2
+- **Status**: ✅ Concluído (2026-01-05)
+- **Artefatos**:
+  - `src/services/piperun_client.py:create_person()` — Implementação com normalização de telefones
 
 ---
 
-### TECH-020: Implementar criação de oportunidade (deal)
+### TECH-020: Implementar criação de oportunidade (deal) ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar oportunidade no Piperun em pipeline/stage configurados.
 - **Critérios de Aceitação**:
-  - [ ] Função `create_deal(title, pipeline_id, stage_id, origin_id, person_id, company_id) -> deal_id`
-  - [ ] Chamada a `POST /v1/deals`
-  - [ ] Pipeline, stage e origin parametrizados via config/env
-  - [ ] Título no formato: "Lead — [Produto] — [Cidade/UF]"
+  - [x] Função `create_deal(title, pipeline_id, stage_id, origin_id, person_id, company_id) -> deal_id`
+  - [x] Chamada a `POST /v1/deals`
+  - [x] Pipeline, stage e origin parametrizados via config/env
+  - [x] Título no formato: "Lead — [Produto] — [Cidade/UF]"
 - **Dependências**: TECH-015
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-05)
+- **Artefatos**:
+  - `src/services/piperun_client.py:create_deal()` — Implementação com defaults de settings
+  - `src/services/piperun_sync.py:build_deal_title()` — Helper para título formatado
 
 ---
 
-### TECH-021: Implementar criação de nota na oportunidade
+### TECH-021: Implementar criação de nota na oportunidade ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Registrar nota padronizada na oportunidade do Piperun.
 - **Critérios de Aceitação**:
-  - [ ] Função `create_note(deal_id, content) -> note_id`
-  - [ ] Chamada a `POST /v1/notes`
-  - [ ] Conteúdo segue template do PRD (Apêndice 20.3)
-  - [ ] Campos não informados preenchidos com "Não informado"
+  - [x] Função `create_note(deal_id, content) -> note_id`
+  - [x] Chamada a `POST /v1/notes`
+  - [x] Conteúdo segue template do PRD (Apêndice 20.3)
+  - [x] Campos não informados preenchidos com "Não informado"
 - **Dependências**: TECH-015, TECH-020
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-05)
+- **Artefatos**:
+  - `src/services/piperun_client.py:create_note()` — Implementação
+  - `src/services/piperun_client.py:generate_note_template()` — Template do PRD
 
 ---
 
-### US-007: Criar oportunidade no CRM para lead qualificado
+### US-007: Criar oportunidade no CRM para lead qualificado ✅
 
 - **Tipo**: User Story
 - **Descrição**: Como SDR, quero que leads qualificados tenham oportunidade criada automaticamente no CRM, para que eu possa acompanhar o funil.
 - **Critérios de Aceitação**:
-  - [ ] Oportunidade criada quando lead tem dados mínimos (nome + produto + cidade)
-  - [ ] Oportunidade vinculada ao pipeline e stage corretos
-  - [ ] Nota com resumo do atendimento anexada à oportunidade
-  - [ ] ID da oportunidade salvo no campo `oportunidade_pipe_id` do orçamento
+  - [x] Oportunidade criada quando lead tem dados mínimos (nome + produto + cidade)
+  - [x] Oportunidade vinculada ao pipeline e stage corretos
+  - [x] Nota com resumo do atendimento anexada à oportunidade
+  - [x] ID da oportunidade salvo no campo `oportunidade_pipe_id` do orçamento
+  - [x] Idempotência: verifica se já existe oportunidade antes de criar nova
+  - [x] Dedupe de empresa por CNPJ
 - **Dependências**: TECH-020, TECH-021, TECH-013
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-05)
+- **Artefatos**:
+  - `src/services/piperun_sync.py` — Serviço de sincronização com Piperun
+  - `src/agents/sdr_agent.py` — Integração com fluxo de qualificação
+  - `tests/services/test_piperun_sync.py` — 30 testes unitários e de integração
+- **Validação**:
+  - ✅ 81 testes passando (piperun_client + piperun_sync)
+  - ✅ Linting OK (ruff check)
+  - ✅ Integração com fluxo de classificação de temperatura
+  - ✅ Sincronização automática para leads "quentes"
+  - ✅ Idempotência: não cria duplicatas se oportunidade já existe
 
 ---
 
 ## Epic 7 — Integração Chatwoot
 
 > Sincronizar conversas e permitir intervenção humana.
-
+e @back
 ### TECH-022: Integrar com Chatwoot para registro de conversas
 
 - **Tipo**: Technical Story
@@ -893,7 +930,7 @@
 ### US-009: Gerar resumo de handoff para lead quente
 
 - **Tipo**: User Story
-- **Descrição**: Como SDR, quando um lead quente for identificado, quero receber um resumo estruturado no Chatwoot, para assumir o atendimento com contexto.
+- **Descrição**: Como SDR, quando um lead quente for identificado, quero recebAgora queer um resumo estruturado no Chatwoot, para assumir o atendimento com contexto.
 - **Critérios de Aceitação**:
   - [ ] Resumo gerado no formato do template (Apêndice 20.4)
   - [ ] Campos: Nome, Empresa, Localização, Produto, Capacidade, Urgência, Conhece Seleto, Observações

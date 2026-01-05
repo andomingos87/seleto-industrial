@@ -25,6 +25,7 @@ from src.services.knowledge_base import (
 from src.services.unavailable_products import get_espeto_context_for_agent
 from src.services.upsell import get_upsell_context_for_agent
 from src.services.lead_persistence import get_persisted_lead_data, persist_lead_data
+from src.services.piperun_sync import should_sync_to_piperun, sync_lead_to_piperun
 from src.services.prompt_loader import get_system_prompt_path, load_system_prompt_from_xml
 from src.services.temperature_classification import classify_lead, should_classify_lead
 from src.utils.logging import get_logger, set_phone
@@ -220,6 +221,34 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
                 # Update local lead_data with temperature
                 lead_data["temperature"] = temperature
                 lead_data["temperature_justification"] = justification
+
+                # US-007: Sync to Piperun CRM if criteria met
+                if should_sync_to_piperun(lead_data, temperature):
+                    try:
+                        deal_id = await sync_lead_to_piperun(
+                            phone=normalized_phone,
+                            lead_data=lead_data,
+                            conversation_summary=justification,
+                        )
+                        if deal_id:
+                            logger.info(
+                                "Lead synced to Piperun CRM",
+                                extra={
+                                    "phone": normalized_phone,
+                                    "deal_id": deal_id,
+                                    "temperature": temperature,
+                                },
+                            )
+                    except Exception as sync_error:
+                        logger.warning(
+                            "Failed to sync lead to Piperun",
+                            extra={
+                                "phone": normalized_phone,
+                                "error": str(sync_error),
+                            },
+                        )
+                        # Continue without sync - non-blocking
+
         except Exception as e:
             logger.warning(
                 "Failed to classify lead temperature",
