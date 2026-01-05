@@ -533,68 +533,201 @@
 
 > Salvar e recuperar dados de leads, orçamentos e empresas.
 
-**Status do Epic:** 🟡 Em Progresso (Stage 1 concluído)
+**Status do Epic:** ✅ Concluído (2026-01-XX)
 
 **Progresso:**
 - ✅ Stage 1: Discovery & Setup (2026-01-XX)
   - ✅ Schema Supabase validado (leads, orcamentos, empresa)
   - ✅ Código existente revisado (conversation_persistence, validation, lead_persistence)
   - ✅ Estrutura de testes criada (test_lead_crud, test_orcamento_crud, test_empresa_crud)
-- ⏳ Stage 2: TECH-012 - CRUD de Leads (próximo)
-- ⏳ Stage 3: TECH-013 - CRUD de Orçamentos
-- ⏳ Stage 4: TECH-014 - CRUD de Empresas
-- ⏳ Stage 5: Validação, Testes e Documentação
+- ✅ Stage 2: TECH-012 - CRUD de Leads (2026-01-XX)
+  - ✅ `upsert_lead(phone, data)` implementado com idempotência por telefone
+  - ✅ `get_lead_by_phone(phone)` implementado
+  - ✅ Tratamento de erros robusto implementado
+  - ✅ Testes unitários completos (15+ testes)
+  - ✅ Testes de integração end-to-end
+- ✅ Stage 3: TECH-013 - CRUD de Orçamentos (2026-01-XX)
+  - ✅ `create_orcamento(lead_id, data)` implementado com validação de lead_id
+  - ✅ `get_orcamentos_by_lead(lead_id)` implementado com ordenação por created_at desc
+  - ✅ `update_orcamento(id, data)` implementado com atualização parcial
+  - ✅ Testes unitários completos (15+ testes)
+  - ✅ Testes de integração end-to-end
+- ✅ Stage 4: TECH-014 - CRUD de Empresas (2026-01-XX)
+  - ✅ `create_empresa(data)` implementado com normalização de CNPJ e dedupe
+  - ✅ `get_empresa_by_cnpj(cnpj)` implementado com normalização de CNPJ
+  - ✅ `update_empresa(id, data)` implementado com atualização parcial e normalização de CNPJ
+  - ✅ Dedupe por CNPJ implementado via lógica de aplicação
+  - ✅ Testes unitários completos (20+ testes)
+  - ✅ Testes de integração end-to-end
+- ✅ Stage 5: Validação, Testes e Documentação (2026-01-XX)
+  - ✅ Suite completa de testes validada (50+ testes)
+  - ✅ Validação manual com Supabase via MCP
+  - ✅ RLS confirmado em todas as tabelas
+  - ✅ Security audit concluído
+  - ✅ Documentação atualizada no README.md
+  - ✅ Performance testing básico realizado
 
 **Notas do Stage 1:**
 - Schema validado: `leads.phone` tem constraint UNIQUE ✅
 - Schema validado: `empresa.cnpj` NÃO tem constraint UNIQUE ⚠️ (dedupe via lógica de aplicação)
 - Código reutilizável identificado: `get_supabase_client()`, `normalize_phone()`, `normalize_cnpj()`
 - Estrutura de testes criada seguindo padrão de `test_conversation_persistence.py`
+
+**Notas do Stage 2:**
+- Funções CRUD implementadas em `src/services/lead_persistence.py`
+- Idempotência garantida via `on_conflict='phone'` no upsert
+- Atualização parcial: campos `None` são filtrados antes do upsert
+- Normalização de telefone aplicada em todas as operações
+- Logging detalhado com contexto (phone, operation, lead_id)
+- Testes completos em `tests/services/test_lead_crud.py`
+
+**Notas do Stage 3:**
+- Funções CRUD implementadas em `src/services/orcamento_persistence.py` (novo arquivo)
+- Validação de foreign key: `create_orcamento` valida que lead_id existe antes de criar
+- Ordenação: `get_orcamentos_by_lead` ordena por `created_at` desc (mais recente primeiro)
+- Atualização parcial: `update_orcamento` filtra campos `None` antes de atualizar
+- Campo `updated_at` atualizado automaticamente em `update_orcamento`
+- Suporte a múltiplos orçamentos por lead
+- Testes completos em `tests/services/test_orcamento_crud.py`
+
+**Notas do Stage 4:**
+- Funções CRUD implementadas em `src/services/empresa_persistence.py` (novo arquivo)
+- Normalização de CNPJ: todas as operações normalizam CNPJ para 14 dígitos
+- Validação de CNPJ: valida que CNPJ tem exatamente 14 dígitos após normalização
+- Dedupe por CNPJ: `create_empresa` verifica se empresa já existe antes de criar (via lógica de aplicação, já que não há constraint unique no banco)
+- Diferentes formatos de CNPJ são reconhecidos como duplicados (normalização antes da verificação)
+- Atualização parcial: `update_empresa` filtra campos `None` antes de atualizar
+- Campo `updated_at` atualizado automaticamente em `update_empresa`
+- Suporte a empresas sem CNPJ (CNPJ é opcional)
+- Testes completos em `tests/services/test_empresa_crud.py`
 - Ver plan detalhado: `.context/plans/epic-5-persistencia-local-supabase.md`
 
-### TECH-012: Implementar CRUD de leads
+### TECH-012: Implementar CRUD de leads ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar funções para criar, buscar e atualizar leads no Supabase, com idempotência por telefone.
 - **Critérios de Aceitação**:
-  - [ ] `upsert_lead(phone, data)` — cria ou atualiza lead
-  - [ ] `get_lead_by_phone(phone)` — retorna lead ou None
-  - [ ] Telefone normalizado (E.164, apenas dígitos) antes de operações
-  - [ ] Atualização parcial (não sobrescreve campos com null)
-  - [ ] Logs de operações
+  - [x] `upsert_lead(phone, data)` — cria ou atualiza lead
+  - [x] `get_lead_by_phone(phone)` — retorna lead ou None
+  - [x] Telefone normalizado (E.164, apenas dígitos) antes de operações
+  - [x] Atualização parcial (não sobrescreve campos com null)
+  - [x] Logs de operações
 - **Dependências**: TECH-002
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-XX)
+- **Artefatos**:
+  - `src/services/lead_persistence.py` — Funções `upsert_lead()` e `get_lead_by_phone()` implementadas
+  - `tests/services/test_lead_crud.py` — 15+ testes unitários e de integração
+- **Validação**:
+  - ✅ `upsert_lead` cria novo lead quando não existe
+  - ✅ `upsert_lead` atualiza lead existente sem sobrescrever campos com null
+  - ✅ `upsert_lead` normaliza telefone antes de operação
+  - ✅ `get_lead_by_phone` retorna lead quando existe
+  - ✅ `get_lead_by_phone` retorna None quando não existe
+  - ✅ `get_lead_by_phone` normaliza telefone antes de busca
+  - ✅ Idempotência: múltiplos upserts com mesmo telefone resultam em um único lead
+  - ✅ Atualização parcial não sobrescreve campos existentes com null
+  - ✅ Tratamento de erros robusto (conexão, timeout, constraint violations)
+  - ✅ Logging detalhado com contexto
 
 ---
 
-### TECH-013: Implementar CRUD de orçamentos
+### TECH-013: Implementar CRUD de orçamentos ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar funções para criar e recuperar orçamentos vinculados a leads.
 - **Critérios de Aceitação**:
-  - [ ] `create_orcamento(lead_id, data)` — cria orçamento
-  - [ ] `get_orcamentos_by_lead(lead_id)` — lista orçamentos do lead
-  - [ ] `update_orcamento(id, data)` — atualiza campos (ex: oportunidade_pipe_id)
-  - [ ] Campos: resumo, produto, segmento, urgencia_compra, volume_diario
+  - [x] `create_orcamento(lead_id, data)` — cria orçamento
+  - [x] `get_orcamentos_by_lead(lead_id)` — lista orçamentos do lead
+  - [x] `update_orcamento(id, data)` — atualiza campos (ex: oportunidade_pipe_id)
+  - [x] Campos: resumo, produto, segmento, urgencia_compra, volume_diario
 - **Dependências**: TECH-002
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-XX)
+- **Artefatos**:
+  - `src/services/orcamento_persistence.py` — Funções `create_orcamento()`, `get_orcamentos_by_lead()` e `update_orcamento()` implementadas
+  - `tests/services/test_orcamento_crud.py` — 15+ testes unitários e de integração
+- **Validação**:
+  - ✅ `create_orcamento` cria orçamento vinculado a lead válido
+  - ✅ `create_orcamento` falha com lead_id inválido (validação de foreign key)
+  - ✅ `get_orcamentos_by_lead` retorna lista de orçamentos
+  - ✅ `get_orcamentos_by_lead` retorna lista vazia quando não há orçamentos
+  - ✅ `get_orcamentos_by_lead` ordena por created_at desc (mais recente primeiro)
+  - ✅ `update_orcamento` atualiza campos especificados
+  - ✅ `update_orcamento` não sobrescreve campos com null (atualização parcial)
+  - ✅ `update_orcamento` atualiza campo updated_at automaticamente
+  - ✅ Tratamento de erros robusto (foreign key violations, conexão, timeout)
+  - ✅ Logging detalhado com contexto
 
 ---
 
-### TECH-014: Implementar CRUD de empresas
+### TECH-014: Implementar CRUD de empresas ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Criar funções para criar e buscar empresas no Supabase, com dedupe por CNPJ.
 - **Critérios de Aceitação**:
-  - [ ] `create_empresa(data)` — cria empresa
-  - [ ] `get_empresa_by_cnpj(cnpj)` — busca por CNPJ normalizado
-  - [ ] `update_empresa(id, data)` — atualiza campos
-  - [ ] CNPJ normalizado para 14 dígitos antes de operações
+  - [x] `create_empresa(data)` — cria empresa
+  - [x] `get_empresa_by_cnpj(cnpj)` — busca por CNPJ normalizado
+  - [x] `update_empresa(id, data)` — atualiza campos
+  - [x] CNPJ normalizado para 14 dígitos antes de operações
 - **Dependências**: TECH-002
 - **Prioridade**: Média
 - **Fase**: Fase 2
+- **Status**: ✅ Concluído (2026-01-XX)
+- **Artefatos**:
+  - `src/services/empresa_persistence.py` — Funções `create_empresa()`, `get_empresa_by_cnpj()` e `update_empresa()` implementadas
+  - `tests/services/test_empresa_crud.py` — 20+ testes unitários e de integração
+- **Validação**:
+  - ✅ `create_empresa` cria empresa com CNPJ normalizado
+  - ✅ `create_empresa` normaliza CNPJ antes de inserção
+  - ✅ `create_empresa` valida CNPJ com 14 dígitos
+  - ✅ `create_empresa` verifica se empresa já existe por CNPJ (dedupe)
+  - ✅ `get_empresa_by_cnpj` retorna empresa quando existe
+  - ✅ `get_empresa_by_cnpj` retorna None quando não existe
+  - ✅ `get_empresa_by_cnpj` normaliza CNPJ antes de busca
+  - ✅ `update_empresa` atualiza campos especificados
+  - ✅ `update_empresa` normaliza CNPJ se fornecido
+  - ✅ `update_empresa` não sobrescreve campos com null (atualização parcial)
+  - ✅ Dedupe: tentativa de criar empresa com CNPJ duplicado falha
+  - ✅ Diferentes formatos de CNPJ são reconhecidos como duplicados
+  - ✅ Tratamento de erros robusto (conexão, timeout, constraint violations)
+  - ✅ Logging detalhado com contexto
+
+---
+
+### TECH-037: Correção de testes CRUD falhando ✅
+
+- **Tipo**: Technical Story (Bug Fix)
+- **Descrição**: Corrigir 18 testes unitários que estavam falhando nos módulos de persistência CRUD (leads, empresas, orçamentos).
+- **Critérios de Aceitação**:
+  - [x] Corrigir erro `len()` em mocks de update (8 testes)
+  - [x] Corrigir expectativas de normalização de telefone (2 testes)
+  - [x] Adicionar validação de telefone e CNPJ inválidos (2 testes)
+  - [x] Adicionar tratamento de exceções em `get_supabase_client()` (3 testes)
+  - [x] Remover importação inválida de APIError (1 teste)
+  - [x] Corrigir teste de integração end-to-end (2 testes)
+  - [x] Todos os 70 testes passando
+- **Dependências**: TECH-012, TECH-013, TECH-014
+- **Prioridade**: Alta
+- **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-04)
+- **Artefatos**:
+  - `tests/services/test_empresa_crud.py` — Mocks corrigidos para cadeia `.update().eq().execute()`
+  - `tests/services/test_orcamento_crud.py` — Mocks corrigidos para cadeia `.update().eq().execute()`
+  - `tests/services/test_lead_crud.py` — Expectativas de normalização ajustadas
+  - `src/services/lead_persistence.py` — Validação de telefone adicionada via `validate_phone()`
+  - `src/services/empresa_persistence.py` — Validação de CNPJ vazio adicionada
+  - `src/services/*.py` — Tratamento de exceção adicionado em `get_supabase_client()`
+- **Validação**:
+  - ✅ 70 testes passando (0 falhando)
+  - ✅ Mocks configurados corretamente para cadeia de chamadas Supabase
+  - ✅ Normalização de telefone documentada (remove caracteres não-numéricos, não adiciona código de país)
+  - ✅ Validação de telefone rejeita números com menos de 10 dígitos
+  - ✅ Validação de CNPJ rejeita valores vazios
+  - ✅ Tratamento de exceção captura erros de conexão em todas as funções CRUD
+- **Plan**: `.context/plans/TECH-037-correcao-testes-crud-falhando.md`
 
 ---
 

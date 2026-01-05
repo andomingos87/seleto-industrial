@@ -88,14 +88,120 @@ pytest tests/ -v --cov=src --cov-report=html
 
 ```
 src/
-├── main.py           # Entry point
-├── config/           # Configurações (settings.py)
-├── api/routes/       # Endpoints da API
-├── agents/           # Agentes Agno
-├── services/         # Serviços de negócio
-└── utils/            # Utilitários
-tests/                # Testes automatizados
-prompts/              # Prompts do agente
+├── main.py              # Entry point
+├── config/              # Configurações (settings.py)
+├── api/routes/          # Endpoints da API
+├── agents/              # Agentes Agno
+├── services/            # Serviços de negócio
+│   ├── lead_persistence.py      # CRUD de leads (TECH-012)
+│   ├── orcamento_persistence.py # CRUD de orçamentos (TECH-013)
+│   └── empresa_persistence.py   # CRUD de empresas (TECH-014)
+└── utils/               # Utilitários
+tests/                   # Testes automatizados
+prompts/                 # Prompts do agente
+```
+
+## APIs CRUD (Epic 5)
+
+O projeto implementa operações CRUD completas para leads, orçamentos e empresas no Supabase.
+
+### Leads (`src/services/lead_persistence.py`)
+
+```python
+from src.services.lead_persistence import upsert_lead, get_lead_by_phone
+
+# Criar ou atualizar lead (idempotente por telefone)
+lead = upsert_lead("5511999999999", {
+    "name": "João Silva",
+    "email": "joao@example.com",
+    "city": "São Paulo",
+    "uf": "SP"
+})
+
+# Buscar lead por telefone
+lead = get_lead_by_phone("5511999999999")
+```
+
+**Características:**
+- Idempotência: múltiplos upserts com mesmo telefone resultam em um único lead
+- Normalização automática de telefone (E.164, apenas dígitos)
+- Atualização parcial: campos `None` são filtrados automaticamente
+
+### Orçamentos (`src/services/orcamento_persistence.py`)
+
+```python
+from src.services.orcamento_persistence import (
+    create_orcamento,
+    get_orcamentos_by_lead,
+    update_orcamento
+)
+
+# Criar orçamento vinculado a lead
+orcamento = create_orcamento(lead_id, {
+    "resumo": "Orçamento para FBM100",
+    "produto": "FBM100",
+    "segmento": "Alimentício",
+    "urgencia_compra": "Alta",
+    "volume_diario": 1000
+})
+
+# Listar orçamentos de um lead (ordenados por data, mais recente primeiro)
+orcamentos = get_orcamentos_by_lead(lead_id)
+
+# Atualizar orçamento
+orcamento = update_orcamento(orcamento_id, {
+    "oportunidade_pipe_id": "pipe-123"
+})
+```
+
+**Características:**
+- Validação de foreign key: verifica se lead existe antes de criar
+- Ordenação automática por `created_at` desc
+- Suporte a múltiplos orçamentos por lead
+
+### Empresas (`src/services/empresa_persistence.py`)
+
+```python
+from src.services.empresa_persistence import (
+    create_empresa,
+    get_empresa_by_cnpj,
+    update_empresa
+)
+
+# Criar empresa (com dedupe por CNPJ)
+empresa = create_empresa({
+    "nome": "Empresa Teste LTDA",
+    "cidade": "São Paulo",
+    "uf": "SP",
+    "cnpj": "12.345.678/0001-90",  # Será normalizado para 12345678000190
+    "email": "contato@example.com"
+})
+
+# Buscar empresa por CNPJ
+empresa = get_empresa_by_cnpj("12.345.678/0001-90")
+
+# Atualizar empresa
+empresa = update_empresa(empresa_id, {
+    "email": "novo@example.com"
+})
+```
+
+**Características:**
+- Normalização automática de CNPJ (14 dígitos)
+- Deduplicação por CNPJ (verifica se empresa já existe antes de criar)
+- Validação de CNPJ (deve ter exatamente 14 dígitos)
+- Suporte a empresas sem CNPJ (CNPJ é opcional)
+
+### Testes CRUD
+
+```bash
+# Executar testes de CRUD
+pytest tests/services/test_lead_crud.py -v
+pytest tests/services/test_orcamento_crud.py -v
+pytest tests/services/test_empresa_crud.py -v
+
+# Executar todos os testes de CRUD
+pytest tests/services/test_*_crud.py -v
 ```
 
 ## Desenvolvimento
