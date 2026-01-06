@@ -11,6 +11,8 @@ Este diretório contém procedimentos operacionais documentados para cenários c
 | [Reprocessar Mensagens](./reprocessar-mensagens.md) | Reprocessar mensagens que falharam no processamento | Média |
 | [Atualizar Base de Conhecimento](./atualizar-base-conhecimento.md) | Atualizar informações de produtos e FAQs | Baixa |
 | [Verificar Saúde do Sistema](./verificar-saude-sistema.md) | Diagnosticar e verificar estado do sistema | Alta |
+| [Operações Pendentes](./operacoes-pendentes.md) | Gerenciar operações pendentes de sincronização com CRM | Média |
+| [Solicitações LGPD](./solicitacoes-lgpd.md) | Atender solicitações de titulares de dados (LGPD) | Alta |
 
 ## Estrutura de Runbook
 

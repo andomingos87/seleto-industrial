@@ -18,7 +18,7 @@
 
 ---
 
-## Epic 1 — Infraestrutura e Setup Inicial
+## Epic 1 — Infraestrutura e Setup Inicial ✅
 
 > Preparar ambiente de desenvolvimento, runtime e integrações base.
 
@@ -130,7 +130,7 @@
 
 ---
 
-## Epic 2 — Ingestão de Mensagens (WhatsApp)
+## Epic 2 — Ingestão de Mensagens (WhatsApp) ✅
 
 > Receber e processar mensagens do provedor WhatsApp.
 
@@ -246,7 +246,7 @@
 
 ---
 
-## Epic 3 — Agente Conversacional (Core)
+## Epic 3 — Agente Conversacional (Core) ✅
 
 > Lógica do agente de IA para atendimento e qualificação.
 
@@ -455,7 +455,7 @@
 
 ---
 
-## Epic 4 — Classificação de Temperatura
+## Epic 4 — Classificação de Temperatura ✅
 
 > Classificar leads em frio/morno/quente.
 
@@ -529,7 +529,7 @@
 
 ---
 
-## Epic 5 — Persistência Local (Supabase)
+## Epic 5 — Persistência Local (Supabase) ✅
 
 > Salvar e recuperar dados de leads, orçamentos e empresas.
 
@@ -1133,7 +1133,7 @@
 
 ---
 
-## Epic 9 — Segurança e Conformidade
+## Epic 9 — Segurança e Conformidade ✅
 
 > Garantir segurança de dados e conformidade com LGPD.
 
@@ -1182,7 +1182,7 @@
 
 ---
 
-## Epic 10 — Tratamento de Erros e Resiliência
+## Epic 10 — Tratamento de Erros e Resiliência ✅
 
 > Garantir robustez em cenários de falha.
 
