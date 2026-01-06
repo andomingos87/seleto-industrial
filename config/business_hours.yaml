@@ -1,0 +1,31 @@
+# Business Hours Configuration
+# Configures when the SDR agent should consider business hours active
+# This affects auto-resume behavior after SDR intervention
+
+# Timezone for business hours calculation
+# Uses IANA timezone database names (e.g., America/Sao_Paulo)
+timezone: "America/Sao_Paulo"
+
+# Schedule by day of week
+# Each day can have:
+#   - start: Opening time in HH:MM format
+#   - end: Closing time in HH:MM format
+#   - null: Closed for the entire day
+schedule:
+  monday:
+    start: "08:00"
+    end: "18:00"
+  tuesday:
+    start: "08:00"
+    end: "18:00"
+  wednesday:
+    start: "08:00"
+    end: "18:00"
+  thursday:
+    start: "08:00"
+    end: "18:00"
+  friday:
+    start: "08:00"
+    end: "18:00"
+  saturday: null  # Closed
+  sunday: null    # Closed

@@ -60,5 +60,12 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"
 
+    # Business Hours (optional overrides for config/business_hours.yaml)
+    # If set, these override the YAML configuration
+    BUSINESS_HOURS_TIMEZONE: str | None = None  # e.g., "America/Sao_Paulo"
+    BUSINESS_HOURS_START: str | None = None  # e.g., "08:00" (applies to all days)
+    BUSINESS_HOURS_END: str | None = None  # e.g., "18:00" (applies to all days)
+    # Note: For detailed per-day configuration, use config/business_hours.yaml
+
 
 settings = Settings()

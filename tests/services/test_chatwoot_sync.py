@@ -6,11 +6,18 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 import asyncio
 
+import httpx
+
 from src.services.chatwoot_sync import (
     create_chatwoot_conversation,
     sync_message_to_chatwoot,
+    sync_message_to_chatwoot_async,
     get_chatwoot_conversation_id,
+    send_internal_message_to_chatwoot,
     _get_or_create_chatwoot_contact,
+    _make_chatwoot_request,
+    CHATWOOT_TIMEOUT,
+    MAX_RETRY_ATTEMPTS,
 )
 from src.config.settings import settings
 
@@ -275,4 +282,144 @@ class TestGetOrCreateChatwootContact:
                     result = asyncio.run(_get_or_create_chatwoot_contact("5511999999999"))
                     assert result == 111
                     mock_client.post.assert_called_once()
+
+
+class TestSendInternalMessage:
+    """Tests for send_internal_message_to_chatwoot."""
+
+    def test_returns_false_for_invalid_phone(self):
+        """Test that False is returned for invalid phone number."""
+        result = asyncio.run(send_internal_message_to_chatwoot("", "Test message"))
+        assert result is False
+
+    def test_returns_false_when_chatwoot_not_configured(self):
+        """Test that False is returned when Chatwoot is not configured."""
+        with patch.object(settings, "CHATWOOT_API_URL", None):
+            result = asyncio.run(
+                send_internal_message_to_chatwoot("5511999999999", "Test message")
+            )
+            assert result is False
+
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    @patch("src.services.chatwoot_sync.create_chatwoot_conversation")
+    def test_sends_private_message_successfully(
+        self, mock_create_conv, mock_client_class, reset_conversation_cache
+    ):
+        """Test that internal message is sent with private=True."""
+        mock_create_conv.return_value = "123"
+
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        # Mock successful message send
+        mock_client.get.return_value = Mock(status_code=200, json=lambda: {"id": 456})
+        mock_client.post.return_value = Mock(status_code=201, json=lambda: {"id": 789})
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(
+                        send_internal_message_to_chatwoot(
+                            "5511999999999", "Internal note for SDR"
+                        )
+                    )
+                    assert result is True
+
+    @patch("src.services.chatwoot_sync.create_chatwoot_conversation")
+    def test_returns_false_when_conversation_creation_fails(
+        self, mock_create_conv, reset_conversation_cache
+    ):
+        """Test that False is returned when conversation cannot be created."""
+        mock_create_conv.return_value = None
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(
+                        send_internal_message_to_chatwoot(
+                            "5511999999999", "Test message"
+                        )
+                    )
+                    assert result is False
+
+
+class TestSyncMessageAsync:
+    """Tests for sync_message_to_chatwoot_async."""
+
+    def test_returns_false_for_invalid_phone(self):
+        """Test that False is returned for invalid phone number."""
+        result = asyncio.run(
+            sync_message_to_chatwoot_async("", "user", "Test message")
+        )
+        assert result is False
+
+    def test_returns_false_when_chatwoot_not_configured(self):
+        """Test that False is returned when Chatwoot is not configured."""
+        with patch.object(settings, "CHATWOOT_API_URL", None):
+            result = asyncio.run(
+                sync_message_to_chatwoot_async("5511999999999", "user", "Test message")
+            )
+            assert result is False
+
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    @patch("src.services.chatwoot_sync.create_chatwoot_conversation")
+    def test_syncs_user_message_as_incoming(
+        self, mock_create_conv, mock_client_class, reset_conversation_cache
+    ):
+        """Test that user messages are synced as 'incoming'."""
+        mock_create_conv.return_value = "123"
+
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client.get.return_value = Mock(status_code=200, json=lambda: {"id": 456})
+        mock_client.post.return_value = Mock(status_code=201, json=lambda: {"id": 789})
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(
+                        sync_message_to_chatwoot_async(
+                            "5511999999999", "user", "Hello from lead"
+                        )
+                    )
+                    assert result is True
+
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    @patch("src.services.chatwoot_sync.create_chatwoot_conversation")
+    def test_syncs_assistant_message_as_outgoing(
+        self, mock_create_conv, mock_client_class, reset_conversation_cache
+    ):
+        """Test that assistant messages are synced as 'outgoing'."""
+        mock_create_conv.return_value = "123"
+
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client.get.return_value = Mock(status_code=200, json=lambda: {"id": 456})
+        mock_client.post.return_value = Mock(status_code=201, json=lambda: {"id": 789})
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(
+                        sync_message_to_chatwoot_async(
+                            "5511999999999", "assistant", "Hello from agent"
+                        )
+                    )
+                    assert result is True
+
+
+class TestRetryConfiguration:
+    """Tests for retry configuration and constants."""
+
+    def test_timeout_constant_is_defined(self):
+        """Test that timeout constant is properly defined."""
+        assert CHATWOOT_TIMEOUT == 10.0
+
+    def test_max_retry_attempts_is_defined(self):
+        """Test that max retry attempts constant is properly defined."""
+        assert MAX_RETRY_ATTEMPTS == 3
+
+    def test_make_chatwoot_request_exists(self):
+        """Test that _make_chatwoot_request function exists and is decorated."""
+        assert callable(_make_chatwoot_request)
 

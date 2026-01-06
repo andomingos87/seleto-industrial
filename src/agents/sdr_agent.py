@@ -3,6 +3,8 @@ SDR Agent - Conversational agent for lead qualification.
 
 This module implements the main agent logic with system prompt loading,
 conversation memory, response generation, and knowledge base integration (US-003).
+
+US-008: Supports pause/resume functionality when SDR intervenes via Chatwoot.
 """
 
 import asyncio
@@ -14,8 +16,13 @@ from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 
 from src.config.settings import settings
+from src.services.agent_pause import (
+    is_agent_paused,
+    try_auto_resume,
+)
 from src.services.conversation_memory import conversation_memory
 from src.services.data_extraction import extract_lead_data
+from src.services.handoff_summary import trigger_handoff_on_hot_lead
 from src.services.knowledge_base import (
     get_knowledge_base,
     is_commercial_query,
@@ -154,11 +161,12 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
     Process an incoming message and generate a response.
 
     This function:
-    1. Adds the user message to conversation history
-    2. Checks if it's the first message (to send greeting)
-    3. Generates agent response using conversation context
-    4. Adds agent response to conversation history
-    5. Returns the response text
+    1. Checks if agent is paused (US-008 - SDR intervention)
+    2. Adds the user message to conversation history
+    3. Checks if it's the first message (to send greeting)
+    4. Generates agent response using conversation context
+    5. Adds agent response to conversation history
+    6. Returns the response text
 
     Args:
         phone: Phone number of the sender (will be normalized)
@@ -166,7 +174,7 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
         sender_name: Optional sender name
 
     Returns:
-        Response text from the agent
+        Response text from the agent, or empty string if paused
 
     Raises:
         Exception: If agent processing fails
@@ -181,6 +189,29 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
     set_phone(normalized_phone)
 
     start_time = time.perf_counter()
+
+    # US-008: Check if agent is paused for this conversation
+    if is_agent_paused(normalized_phone):
+        # Try auto-resume if outside business hours
+        if try_auto_resume(normalized_phone):
+            logger.info(
+                "Agent auto-resumed (outside business hours)",
+                extra={"phone": normalized_phone},
+            )
+            # Continue processing normally after auto-resume
+        else:
+            # Agent is paused and within business hours - don't process
+            logger.info(
+                "Agent paused - message not processed (within business hours)",
+                extra={
+                    "phone": normalized_phone,
+                    "message_preview": message[:50] if message else "",
+                },
+            )
+            # Still add the message to conversation history for SDR visibility
+            conversation_memory.add_message(normalized_phone, "user", message)
+            # Return empty string to indicate no response should be sent
+            return ""
 
     # Check if this is the first message
     is_first = conversation_memory.is_first_message(normalized_phone)
@@ -248,6 +279,33 @@ async def process_message(phone: str, message: str, sender_name: Optional[str] =
                             },
                         )
                         # Continue without sync - non-blocking
+
+                # US-009: Trigger handoff summary for hot leads
+                if temperature == "quente":
+                    try:
+                        handoff_sent = await trigger_handoff_on_hot_lead(
+                            phone=normalized_phone,
+                            lead_data=lead_data,
+                            temperature=temperature,
+                            justification=justification,
+                        )
+                        if handoff_sent:
+                            logger.info(
+                                "Handoff summary sent for hot lead",
+                                extra={
+                                    "phone": normalized_phone,
+                                    "temperature": temperature,
+                                },
+                            )
+                    except Exception as handoff_error:
+                        logger.warning(
+                            "Failed to send handoff summary",
+                            extra={
+                                "phone": normalized_phone,
+                                "error": str(handoff_error),
+                            },
+                        )
+                        # Continue without handoff - non-blocking
 
         except Exception as e:
             logger.warning(

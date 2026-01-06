@@ -69,6 +69,10 @@ WhatsApp → Z-API Webhook → Message Processing → SDR Agent → Response →
 - **Conversation Memory** (`conversation_memory.py`) - In-memory cache + Supabase sync
 - **WhatsApp** (`whatsapp.py`) - Z-API integration with retry logic
 - **Knowledge Base** (`knowledge_base.py`) - Product info and FAQs
+- **Chatwoot Sync** (`chatwoot_sync.py`) - Bidirectional message sync with Chatwoot
+- **Agent Pause** (`agent_pause.py`) - Pause/resume agent on SDR intervention
+- **Business Hours** (`business_hours.py`) - Business hours configuration and verification
+- **Handoff Summary** (`handoff_summary.py`) - Generate and send hot lead summaries
 
 ### System Prompt
 
@@ -104,6 +108,7 @@ For full integration (MVP):
 | `GET /api/health` | Detailed health status |
 | `POST /webhook/text` | Text message webhook (Z-API) |
 | `POST /webhook/audio` | Audio message webhook (Z-API) |
+| `POST /webhook/chatwoot` | Chatwoot webhook (SDR intervention) |
 | `GET /docs` | Swagger UI |
 
 ## Key Implementation Notes
@@ -112,6 +117,9 @@ For full integration (MVP):
 2. **Lead operations** are idempotent - multiple upserts with same phone = one lead.
 3. **Async operations** - Agent processing and message sending are async.
 4. **No hardcoded credentials** - All secrets via environment variables.
+5. **Agent Pause/Resume** - Agent pauses when SDR sends message in Chatwoot; resumes via `/retomar` command or automatically outside business hours.
+6. **Handoff Summary** - Structured summary sent to Chatwoot as internal note when lead is classified as "quente" (hot).
+7. **Business Hours** - Configured in `config/business_hours.yaml` (default: Mon-Fri 08:00-18:00 America/Sao_Paulo).
 
 ## Documentation
 

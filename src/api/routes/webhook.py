@@ -1,5 +1,9 @@
 """
 Webhook endpoints for receiving messages from external services.
+
+Supports:
+- Z-API (WhatsApp) webhooks for text/audio messages
+- Chatwoot webhooks for SDR intervention detection and commands
 """
 
 import asyncio
@@ -11,6 +15,12 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from src.agents.sdr_agent import process_message
+from src.services.agent_pause import (
+    is_resume_command,
+    pause_agent,
+    process_sdr_command,
+)
+from src.services.chatwoot_sync import send_internal_message_to_chatwoot
 from src.services.transcription import transcribe_audio
 from src.services.whatsapp import send_whatsapp_message, whatsapp_service
 from src.utils.logging import (
@@ -512,6 +522,355 @@ async def whatsapp_webhook(
     log_webhook_response(
         logger,
         webhook_type="whatsapp",
+        status_code=200,
+        duration_ms=duration_ms,
+    )
+
+    # Return 200 immediately (async processing continues in background)
+    return Response(
+        status_code=status.HTTP_200_OK,
+        content='{"status": "received"}',
+        media_type="application/json",
+    )
+
+
+# =============================================================================
+# Chatwoot Webhook Endpoint (US-008: SDR Intervention Detection)
+# =============================================================================
+
+
+class ChatwootSender(BaseModel):
+    """Chatwoot message sender object."""
+
+    id: Optional[int] = Field(None, description="Sender ID")
+    name: Optional[str] = Field(None, description="Sender name")
+    type: Optional[str] = Field(None, description="Sender type: 'user' (SDR) or 'contact' (lead)")
+    email: Optional[str] = Field(None, description="Sender email")
+
+
+class ChatwootConversation(BaseModel):
+    """Chatwoot conversation object."""
+
+    id: Optional[int] = Field(None, description="Conversation ID")
+    inbox_id: Optional[int] = Field(None, description="Inbox ID")
+    contact_inbox: Optional[dict] = Field(None, description="Contact inbox details")
+    meta: Optional[dict] = Field(None, description="Conversation metadata")
+
+
+class ChatwootContact(BaseModel):
+    """Chatwoot contact object."""
+
+    id: Optional[int] = Field(None, description="Contact ID")
+    name: Optional[str] = Field(None, description="Contact name")
+    phone_number: Optional[str] = Field(None, description="Contact phone number")
+    email: Optional[str] = Field(None, description="Contact email")
+
+
+class ChatwootMessage(BaseModel):
+    """Chatwoot message object."""
+
+    id: Optional[int] = Field(None, description="Message ID")
+    content: Optional[str] = Field(None, description="Message content")
+    message_type: Optional[str] = Field(None, description="Message type: incoming/outgoing")
+    content_type: Optional[str] = Field(None, description="Content type: text/input_select/etc")
+    private: Optional[bool] = Field(False, description="Whether message is private/internal")
+    sender: Optional[ChatwootSender] = Field(None, description="Message sender")
+    conversation_id: Optional[int] = Field(None, description="Conversation ID")
+    created_at: Optional[str] = Field(None, description="Creation timestamp")
+
+
+class ChatwootWebhookPayload(BaseModel):
+    """
+    Chatwoot webhook payload for message events.
+
+    Chatwoot sends webhooks with the following structure:
+    {
+        "event": "message_created",
+        "message": {...},
+        "conversation": {...},
+        "contact": {...},
+        "account": {...}
+    }
+    """
+
+    event: Optional[str] = Field(None, description="Webhook event type")
+    message: Optional[ChatwootMessage] = Field(None, description="Message object")
+    conversation: Optional[ChatwootConversation] = Field(None, description="Conversation object")
+    contact: Optional[ChatwootContact] = Field(None, description="Contact object")
+    account: Optional[dict] = Field(None, description="Account object")
+
+
+def _is_sdr_message(payload: ChatwootWebhookPayload) -> bool:
+    """
+    Check if the message is from an SDR (human agent) vs a contact (lead).
+
+    SDR messages have sender.type == "user"
+    Contact messages have sender.type == "contact"
+
+    Args:
+        payload: Chatwoot webhook payload
+
+    Returns:
+        True if message is from SDR, False otherwise
+    """
+    if not payload.message or not payload.message.sender:
+        return False
+
+    sender_type = payload.message.sender.type
+    return sender_type == "user"
+
+
+def _extract_phone_from_payload(payload: ChatwootWebhookPayload) -> Optional[str]:
+    """
+    Extract the lead's phone number from the Chatwoot webhook payload.
+
+    Args:
+        payload: Chatwoot webhook payload
+
+    Returns:
+        Normalized phone number or None
+    """
+    phone = None
+
+    # Try to get phone from contact
+    if payload.contact and payload.contact.phone_number:
+        phone = payload.contact.phone_number
+
+    # Try to get phone from conversation metadata if not in contact
+    if not phone and payload.conversation and payload.conversation.meta:
+        meta = payload.conversation.meta
+        # Chatwoot stores phone in meta.sender.phone_number for WhatsApp
+        if "sender" in meta and isinstance(meta["sender"], dict):
+            phone = meta["sender"].get("phone_number")
+
+    if phone:
+        return normalize_phone(phone)
+
+    return None
+
+
+async def process_chatwoot_message(payload: ChatwootWebhookPayload) -> dict:
+    """
+    Process incoming Chatwoot webhook message.
+
+    This function:
+    1. Identifies if message is from SDR (sender.type == "user")
+    2. If SDR message and not a command: pause the agent
+    3. If SDR command (/retomar, /continuar): process command
+    4. Private messages are not shown to lead
+
+    Args:
+        payload: Chatwoot webhook payload
+
+    Returns:
+        Processing result dictionary
+    """
+    if not payload.message:
+        return {"status": "ignored", "reason": "no_message"}
+
+    message_content = payload.message.content or ""
+    is_private = payload.message.private or False
+    is_from_sdr = _is_sdr_message(payload)
+
+    # Extract phone number for the conversation
+    phone = _extract_phone_from_payload(payload)
+
+    if not phone:
+        logger.warning(
+            "Chatwoot webhook: could not extract phone number",
+            extra={
+                "conversation_id": payload.conversation.id if payload.conversation else None,
+                "message_id": payload.message.id,
+            },
+        )
+        return {"status": "error", "reason": "no_phone"}
+
+    # Set phone in context for logging
+    set_phone(phone)
+
+    sender_name = payload.message.sender.name if payload.message.sender else None
+    sender_id = str(payload.message.sender.id) if payload.message.sender and payload.message.sender.id else None
+
+    logger.info(
+        "Chatwoot message received",
+        extra={
+            "phone": phone,
+            "message_id": payload.message.id,
+            "is_from_sdr": is_from_sdr,
+            "is_private": is_private,
+            "sender_name": sender_name,
+            "sender_type": payload.message.sender.type if payload.message.sender else None,
+            "message_preview": message_content[:50] if message_content else None,
+        },
+    )
+
+    # Process only SDR messages (not contact/lead messages)
+    if not is_from_sdr:
+        logger.debug(
+            "Message from contact (not SDR) - no action needed",
+            extra={"phone": phone},
+        )
+        return {"status": "ignored", "reason": "contact_message"}
+
+    # Check if it's a resume command
+    if is_resume_command(message_content):
+        was_command, response = process_sdr_command(phone, message_content, sender_name)
+        if was_command:
+            # Send response as private message in Chatwoot
+            if response:
+                asyncio.create_task(
+                    send_internal_message_to_chatwoot(phone, response, sender_name="Sistema")
+                )
+            logger.info(
+                "SDR command processed",
+                extra={
+                    "phone": phone,
+                    "command": message_content.strip().lower(),
+                    "response": response,
+                },
+            )
+            return {"status": "command_processed", "response": response}
+
+    # SDR sent a non-command message - pause the agent
+    # Skip private notes (they don't require pausing)
+    if is_private:
+        logger.debug(
+            "Private note from SDR - no pause needed",
+            extra={"phone": phone, "sender_name": sender_name},
+        )
+        return {"status": "ignored", "reason": "private_note"}
+
+    # Pause the agent for this conversation
+    success = pause_agent(
+        phone=phone,
+        reason="sdr_intervention",
+        sender_name=sender_name,
+        sender_id=sender_id,
+    )
+
+    if success:
+        # Send confirmation as private message
+        confirmation = (
+            f"Agente pausado para esta conversa. "
+            f"O SDR {sender_name or ''} assumiu o atendimento. "
+            f"Use /retomar para reativar o agente."
+        )
+        asyncio.create_task(
+            send_internal_message_to_chatwoot(phone, confirmation, sender_name="Sistema")
+        )
+
+    return {
+        "status": "agent_paused" if success else "pause_failed",
+        "phone": phone,
+        "sender_name": sender_name,
+    }
+
+
+@router.post("/webhook/chatwoot")
+async def chatwoot_webhook(
+    request: Request,
+) -> Response:
+    """
+    Receive webhook from Chatwoot for SDR intervention detection.
+
+    This webhook is triggered when:
+    - SDR sends a message to a lead in Chatwoot
+    - SDR sends a command (/retomar, /continuar)
+
+    The webhook pauses the agent when SDR intervenes and processes
+    resume commands.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        HTTP 200 response (processing happens asynchronously)
+    """
+    start_time = time.perf_counter()
+
+    # Read body from state (set by middleware) or directly
+    if hasattr(request.state, "body"):
+        body_bytes = request.state.body
+    else:
+        body_bytes = await request.body()
+
+    # Parse payload
+    try:
+        payload_data = json.loads(body_bytes)
+
+        logger.debug(
+            "Chatwoot webhook raw payload",
+            extra={
+                "event": payload_data.get("event"),
+                "has_message": "message" in payload_data,
+                "has_conversation": "conversation" in payload_data,
+                "has_contact": "contact" in payload_data,
+            },
+        )
+
+        payload = ChatwootWebhookPayload(**payload_data)
+
+    except json.JSONDecodeError as e:
+        logger.error(
+            "Failed to parse Chatwoot webhook JSON",
+            extra={
+                "error": str(e),
+                "body_preview": body_bytes[:500].decode("utf-8", errors="replace") if body_bytes else None,
+            },
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON payload",
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to validate Chatwoot webhook payload",
+            extra={
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid webhook payload: {str(e)}",
+        )
+
+    # Log webhook received
+    phone = _extract_phone_from_payload(payload)
+    payload_size = len(body_bytes) if body_bytes else None
+
+    log_webhook_received(
+        logger,
+        webhook_type="chatwoot",
+        phone=phone,
+        payload_size=payload_size,
+    )
+
+    # Filter events - only process message_created
+    event_type = payload.event
+    if event_type != "message_created":
+        logger.debug(
+            "Chatwoot webhook event ignored",
+            extra={"event": event_type, "phone": phone},
+        )
+        return Response(
+            status_code=status.HTTP_200_OK,
+            content='{"status": "ignored", "reason": "event_type"}',
+            media_type="application/json",
+        )
+
+    # Process message asynchronously
+    asyncio.create_task(process_chatwoot_message(payload))
+
+    # Calculate response time
+    duration_ms = (time.perf_counter() - start_time) * 1000
+
+    # Log response
+    log_webhook_response(
+        logger,
+        webhook_type="chatwoot",
         status_code=200,
         duration_ms=duration_ms,
     )

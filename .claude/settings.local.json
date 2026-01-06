@@ -10,7 +10,11 @@
       "Bash(./venv/Scripts/python:*)",
       "Bash(cd:*)",
       "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -m pytest \"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\tests\" -v --tb=short)",
-      "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -m pytest:*)"
+      "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -m pytest:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(./venv/Scripts/pip install:*)",
+      "Bash(.venvScriptspython -m pytest tests/services/test_agent_pause.py tests/api/test_chatwoot_webhook.py -v --tb=short)"
     ]
   },
   "enableAllProjectMcpServers": true,
