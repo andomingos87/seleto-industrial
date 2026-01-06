@@ -890,103 +890,246 @@
 
 ---
 
-## Epic 7 — Integração Chatwoot
+## Epic 7 — Integração Chatwoot ✅
 
 > Sincronizar conversas e permitir intervenção humana.
-e @back
-### TECH-022: Integrar com Chatwoot para registro de conversas
+
+**Status do Epic:** ✅ Concluído (2026-01-06)
+
+**Progresso:**
+- ✅ Stage 1: Discovery & Setup (2026-01-06)
+- ✅ Stage 2: TECH-022 - Completar Integração Chatwoot (2026-01-06)
+- ✅ Stage 3: TECH-032 - Horário de Atendimento (2026-01-06)
+- ✅ Stage 4: US-008 - Pausa/Retomada do Agente (2026-01-06)
+- ✅ Stage 5: US-009 - Resumo de Handoff (2026-01-06)
+- ✅ Stage 6: Validação, Testes e Documentação (2026-01-06)
+
+**Artefatos:**
+- `src/services/chatwoot_sync.py` - Sincronização bidirecional com Chatwoot
+- `src/services/business_hours.py` - Configuração de horário de atendimento
+- `src/services/agent_pause.py` - Pausa/retomada do agente
+- `src/services/handoff_summary.py` - Resumo de handoff para leads quentes
+- `src/api/routes/webhook.py` - Endpoint POST /webhook/chatwoot
+- `config/business_hours.yaml` - Configuração de horário
+- `tests/services/test_chatwoot_sync.py` - 27 testes
+- `tests/services/test_business_hours.py` - 28 testes
+- `tests/services/test_agent_pause.py` - 29 testes
+- `tests/services/test_handoff_summary.py` - 44 testes
+- `tests/api/test_chatwoot_webhook.py` - 21 testes
+
+**Plan detalhado:** `.context/plans/epic-7-integracao-chatwoot.md`
+
+### TECH-022: Integrar com Chatwoot para registro de conversas ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Enviar mensagens do agente e do lead para o Chatwoot, mantendo histórico visível para SDRs. Histórico completo também persistido no Supabase (DB) conforme decisão D5.
 - **Critérios de Aceitação**:
-  - [ ] Mensagens do lead replicadas no Chatwoot
-  - [ ] Mensagens do agente replicadas no Chatwoot
-  - [ ] Histórico completo também persistido no Supabase (DB) para auditoria, análise e backup
-  - [ ] Conversa identificada por telefone do lead
-  - [ ] Histórico acessível em tempo real pelo SDR no Chatwoot
+  - [x] Mensagens do lead replicadas no Chatwoot
+  - [x] Mensagens do agente replicadas no Chatwoot
+  - [x] Histórico completo também persistido no Supabase (DB) para auditoria, análise e backup
+  - [x] Conversa identificada por telefone do lead
+  - [x] Histórico acessível em tempo real pelo SDR no Chatwoot
 - **Dependências**: TECH-001
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-06)
+- **Artefatos**:
+  - `src/services/chatwoot_sync.py` - Funções `sync_message_to_chatwoot()`, `send_internal_message_to_chatwoot()`
+  - `tests/services/test_chatwoot_sync.py` - 27 testes unitários
+- **Validação**:
+  - ✅ Mensagens sincronizadas via `sync_message_to_chatwoot()` com direction "incoming"/"outgoing"
+  - ✅ Conversas criadas automaticamente se não existirem
+  - ✅ Contatos criados com phone_number normalizado
+  - ✅ Retry com backoff exponencial (tenacity)
+  - ✅ Cache de conversation_id em memória
 
 ---
 
-### US-008: Pausar agente quando SDR intervir
+### TECH-032: Implementar configuração de horário de atendimento e lógica de retomada ✅
+
+- **Tipo**: Technical Story
+- **Descrição**: Implementar sistema de configuração de horário de atendimento e lógica de retomada do agente após intervenção humana, conforme decisão D7 do PRD.
+- **Critérios de Aceitação**:
+  - [x] Arquivo de configuração de horário de atendimento (`config/business_hours.yaml`) com:
+    - Fuso horário configurável (ex.: `America/Sao_Paulo`)
+    - Dias da semana com atendimento (ex.: segunda a sexta)
+    - Horários de início/fim por dia (ex.: 08:00-18:00)
+  - [x] Função para verificar se está dentro do horário de atendimento
+  - [x] Processamento de comandos do SDR (`/retomar`, `/continuar`) dentro do horário
+  - [x] Retomada automática quando fora do horário e lead enviar nova mensagem
+  - [x] Comandos processados pelo sistema e não aparecem como mensagem visível ao lead
+  - [x] Logs de pausa/retomada com indicação de horário de atendimento
+- **Dependências**: TECH-001, TECH-022
+- **Prioridade**: Alta
+- **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-06)
+- **Artefatos**:
+  - `src/services/business_hours.py` - Funções `is_business_hours()`, `should_auto_resume()`, `get_current_time_info()`
+  - `config/business_hours.yaml` - Configuração YAML com timezone, dias e horários
+  - `tests/services/test_business_hours.py` - 28 testes unitários
+- **Validação**:
+  - ✅ Horário configurável via YAML (timezone, weekdays, start_time, end_time)
+  - ✅ Suporte a feriados (holidays list)
+  - ✅ `is_business_hours()` retorna True/False conforme configuração
+  - ✅ `should_auto_resume()` retorna True quando fora do horário
+  - ✅ Comandos `/retomar` e `/continuar` processados corretamente
+
+---
+
+### US-008: Pausar agente quando SDR intervir ✅
 
 - **Tipo**: User Story
 - **Descrição**: Como SDR, quando eu enviar uma mensagem na conversa pelo Chatwoot, quero que o agente pare de responder automaticamente, para que eu assuma o atendimento.
 - **Critérios de Aceitação**:
-  - [ ] Ao detectar mensagem de SDR no Chatwoot, agente entra em modo "escuta"
-  - [ ] Agente não envia novas mensagens automáticas após intervenção
-  - [ ] **Dentro do horário de atendimento**: agente só retoma mediante comando explícito do SDR (`/retomar` ou `/continuar`)
-  - [ ] **Fora do horário de atendimento**: agente retoma automaticamente quando o lead enviar nova mensagem (SDR não está presente)
-  - [ ] Status de "agente pausado" registrado no contexto da conversa
-  - [ ] Log indicando intervenção humana e horário de atendimento atual
+  - [x] Ao detectar mensagem de SDR no Chatwoot, agente entra em modo "escuta"
+  - [x] Agente não envia novas mensagens automáticas após intervenção
+  - [x] **Dentro do horário de atendimento**: agente só retoma mediante comando explícito do SDR (`/retomar` ou `/continuar`)
+  - [x] **Fora do horário de atendimento**: agente retoma automaticamente quando o lead enviar nova mensagem (SDR não está presente)
+  - [x] Status de "agente pausado" registrado no contexto da conversa
+  - [x] Log indicando intervenção humana e horário de atendimento atual
 - **Dependências**: TECH-022, TECH-032
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-06)
+- **Artefatos**:
+  - `src/services/agent_pause.py` - Funções `is_agent_paused()`, `pause_agent()`, `resume_agent()`, `process_sdr_command()`
+  - `src/api/routes/webhook.py` - Endpoint `POST /webhook/chatwoot` com detecção de SDR
+  - `src/agents/sdr_agent.py` - Verificação de pausa antes de processar mensagens
+  - `tests/services/test_agent_pause.py` - 29 testes unitários
+  - `tests/api/test_chatwoot_webhook.py` - 21 testes do webhook
+- **Validação**:
+  - ✅ Webhook detecta `sender.type == "user"` como mensagem de SDR
+  - ✅ Agente pausado automaticamente quando SDR envia mensagem não-privada
+  - ✅ Notas privadas (`private: true`) não pausam o agente
+  - ✅ Comandos `/retomar` e `/continuar` retomam o agente
+  - ✅ Retomada automática fora do horário via `try_auto_resume()`
+  - ✅ Estado persistido no Supabase via JSONB (`agent_pause_state`)
+  - ✅ Cache em memória para performance
 
 ---
 
-### US-009: Gerar resumo de handoff para lead quente
+### US-009: Gerar resumo de handoff para lead quente ✅
 
 - **Tipo**: User Story
-- **Descrição**: Como SDR, quando um lead quente for identificado, quero recebAgora queer um resumo estruturado no Chatwoot, para assumir o atendimento com contexto.
+- **Descrição**: Como SDR, quando um lead quente for identificado, quero receber um resumo estruturado no Chatwoot, para assumir o atendimento com contexto.
 - **Critérios de Aceitação**:
-  - [ ] Resumo gerado no formato do template (Apêndice 20.4)
-  - [ ] Campos: Nome, Empresa, Localização, Produto, Capacidade, Urgência, Conhece Seleto, Observações
-  - [ ] Resumo enviado como mensagem interna no Chatwoot
-  - [ ] Enviado automaticamente quando temperatura = quente
+  - [x] Resumo gerado no formato do template (Apêndice 20.4)
+  - [x] Campos: Nome, Empresa, Localização, Produto, Capacidade, Urgência, Conhece Seleto, Observações
+  - [x] Resumo enviado como mensagem interna no Chatwoot
+  - [x] Enviado automaticamente quando temperatura = quente
 - **Dependências**: US-006, TECH-022
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-06)
+- **Artefatos**:
+  - `src/services/handoff_summary.py` - Funções `generate_handoff_summary()`, `send_handoff_summary()`, `trigger_handoff_on_hot_lead()`
+  - `src/agents/sdr_agent.py` - Trigger de handoff após classificação de temperatura
+  - `tests/services/test_handoff_summary.py` - 44 testes unitários
+- **Validação**:
+  - ✅ Resumo gerado no formato do PRD (Apêndice 20.4)
+  - ✅ Campos não informados preenchidos com "Nao informado"
+  - ✅ Enviado como mensagem interna (`private: true`) no Chatwoot
+  - ✅ `trigger_handoff_on_hot_lead()` chamado quando temperatura = "quente"
+  - ✅ Prevenção de duplicatas via flag `handoff_summary_sent` no contexto
+  - ✅ Erros não propagam para fluxo principal (non-blocking)
 
 ---
 
-## Epic 8 — Observabilidade e Operações
+## Epic 8 — Observabilidade e Operações ✅
 
 > Monitoramento, métricas e alertas.
 
-### TECH-023: Implementar métricas de latência e taxa de sucesso
+**Status do Epic:** ✅ Concluído (2026-01-06)
+
+**Plano de Implementação:** `.context/plans/epic-8-observabilidade-operacoes.md`
+
+**Progresso:**
+- [x] Stage 1: Discovery & Setup — Concluído 2026-01-06
+  - Análise do sistema de logging atual
+  - Biblioteca prometheus-client documentada (>=0.20.0)
+  - 11 pontos de coleta de métricas identificados
+  - 43 testes unitários criados (15 métricas + 28 alertas)
+- [x] Stage 2: TECH-023 - Métricas de Latência e Taxa de Sucesso — Concluído 2026-01-06
+- [x] Stage 3: TECH-024 - Alertas para Falhas Críticas — Concluído 2026-01-06
+- [x] Stage 4: TECH-025 - Runbook de Operações — Concluído 2026-01-06
+  - Estrutura `documentation/runbooks/` criada
+  - 5 runbooks documentados: Pausar/Retomar Agente, Rotacionar Credenciais, Reprocessar Mensagens, Atualizar Base de Conhecimento, Verificar Saúde do Sistema
+- [x] Stage 5: Validação, Testes e Documentação — Concluído 2026-01-06
+  - 43 testes passando (15 métricas + 28 alertas)
+  - Documentação atualizada (CLAUDE.md, backlog.md)
+  - Security audit concluído
+
+**Artefatos:**
+- `src/services/metrics.py` — Módulo de métricas Prometheus
+- `src/services/alerts.py` — Sistema de alertas
+- `src/api/routes/metrics.py` — Endpoint GET /metrics
+- `documentation/runbooks/` — 5 runbooks operacionais
+- `tests/services/test_metrics.py` — 15 testes
+- `tests/services/test_alerts.py` — 28 testes
+
+### TECH-023: Implementar métricas de latência e taxa de sucesso ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Coletar métricas de tempo de resposta e taxa de sucesso/falha por operação.
 - **Critérios de Aceitação**:
-  - [ ] Métrica de latência por endpoint (P50, P95, P99)
-  - [ ] Taxa de sucesso/falha por integração (WhatsApp, Piperun, Supabase)
-  - [ ] Métricas expostas em formato Prometheus ou equivalente
+  - [x] Métrica de latência por endpoint (P50, P95, P99) via Histogram
+  - [x] Taxa de sucesso/falha por integração (WhatsApp, Piperun, Chatwoot)
+  - [x] Métricas expostas em formato Prometheus via GET /metrics
 - **Dependências**: TECH-004
 - **Prioridade**: Média
 - **Fase**: Fase 2
+- **Concluído em**: 2026-01-06
+- **Artefatos**:
+  - `src/services/metrics.py` — Módulo de métricas Prometheus
+  - `src/api/routes/metrics.py` — Endpoint GET /metrics
+  - `tests/services/test_metrics.py` — 15 testes unitários
+  - `requirements.txt` atualizado com `prometheus-client>=0.20.0`
+- **Integrações instrumentadas**: WhatsApp, Piperun, Chatwoot
 
 ---
 
-### TECH-024: Implementar alertas para falhas críticas
+### TECH-024: Implementar alertas para falhas críticas ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Configurar alertas para falhas contínuas em integrações e degradação de performance.
 - **Critérios de Aceitação**:
-  - [ ] Alerta quando taxa de erro > 10% em janela de 5 minutos
-  - [ ] Alerta quando latência P95 > 10s
-  - [ ] Alerta quando autenticação falhar em qualquer integração
-  - [ ] Notificação via canal configurado (Slack, email, etc.)
+  - [x] Alerta quando taxa de erro > 10% em janela de 5 minutos
+  - [x] Alerta quando latência P95 > 10s
+  - [x] Alerta quando autenticação falhar em qualquer integração
+  - [x] Notificação via canal configurado (Slack, email, webhook)
 - **Dependências**: TECH-023
 - **Prioridade**: Média
 - **Fase**: Fase 2
+- **Concluído em**: 2026-01-06
+- **Artefatos**:
+  - `src/services/alerts.py` — Módulo de alertas
+  - `src/config/settings.py` — Configurações ALERT_* adicionadas
+  - `tests/services/test_alerts.py` — 28 testes unitários
+- **Integrações atualizadas**: WhatsApp, Piperun, Chatwoot
 
 ---
 
-### TECH-025: Criar runbook de operações
+### TECH-025: Criar runbook de operações ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Documentar procedimentos operacionais para cenários comuns.
 - **Critérios de Aceitação**:
-  - [ ] Runbook: Como pausar/retomar o agente manualmente
-  - [ ] Runbook: Como rotacionar credenciais
-  - [ ] Runbook: Como reprocessar mensagens com falha
-  - [ ] Runbook: Como atualizar base de conhecimento
+  - [x] Runbook: Como pausar/retomar o agente manualmente
+  - [x] Runbook: Como rotacionar credenciais
+  - [x] Runbook: Como reprocessar mensagens com falha
+  - [x] Runbook: Como atualizar base de conhecimento
+  - [x] Runbook: Como verificar saúde do sistema
 - **Dependências**: Nenhuma
 - **Prioridade**: Baixa
 - **Fase**: Fase 2
+- **Concluído em**: 2026-01-06
+- **Artefatos**:
+  - `documentation/runbooks/README.md` — Índice de runbooks
+  - `documentation/runbooks/pausar-retomar-agente.md` — Runbook de pausa/retomada
+  - `documentation/runbooks/rotacionar-credenciais.md` — Runbook de rotação de credenciais
+  - `documentation/runbooks/reprocessar-mensagens.md` — Runbook de reprocessamento
+  - `documentation/runbooks/atualizar-base-conhecimento.md` — Runbook de atualização da base
+  - `documentation/runbooks/verificar-saude-sistema.md` — Runbook de verificação de saúde
 
 ---
 
@@ -1043,33 +1186,85 @@ e @back
 
 > Garantir robustez em cenários de falha.
 
-### TECH-029: Implementar retry com backoff para integrações
+**Status do Epic:** 🔄 Em progresso
+
+**Plano de Implementação:** `.context/plans/epic-10-tratamento-erros-resiliencia.md`
+
+**Progresso:**
+- [x] Stage 1: Discovery & Setup — Concluído 2026-01-06
+  - Revisão de integrações existentes (WhatsApp, Chatwoot, Piperun)
+  - Mapeamento de cenários de falha
+  - Biblioteca tenacity documentada (>=8.0.0)
+  - Estrutura de testes criada (79 scaffolds)
+- [x] Stage 2: TECH-029 - Retry com Backoff — Concluído 2026-01-06
+- [x] Stage 3: TECH-030 - Fallback para Falhas de CRM — Concluído 2026-01-06
+  - `src/services/pending_operations.py` - Serviço de operações pendentes
+  - `src/jobs/sync_pending_operations.py` - Job de reprocessamento
+  - `src/api/routes/pending_operations.py` - Endpoints de monitoramento
+  - `migrations/20260106_create_pending_operations.sql` - Migration
+  - `tests/services/test_fallback.py` - 17 testes unitários
+- [ ] Stage 4: TECH-031 - Política de Retenção de Dados e LGPD
+- [ ] Stage 5: Validação, Testes e Documentação
+
+### TECH-029: Implementar retry com backoff para integrações ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Aplicar retry com backoff exponencial em chamadas a APIs externas.
 - **Critérios de Aceitação**:
-  - [ ] Retry em falhas temporárias (5xx, timeout, connection error)
-  - [ ] Máximo de 3 tentativas com backoff exponencial
-  - [ ] Não retry em erros de cliente (4xx exceto 429)
-  - [ ] Log de cada tentativa
+  - [x] Retry em falhas temporárias (5xx, timeout, connection error)
+  - [x] Máximo de 3 tentativas com backoff exponencial
+  - [x] Não retry em erros de cliente (4xx exceto 429)
+  - [x] Log de cada tentativa
 - **Dependências**: TECH-015
 - **Prioridade**: Alta
 - **Fase**: MVP
+- **Status**: ✅ Concluído (2026-01-06)
+- **Artefatos**:
+  - `src/utils/retry.py` — Módulo de retry com decoradores sync/async
+  - `tests/utils/test_retry.py` — 50 testes unitários
+  - `src/services/chatwoot_sync.py` — Migrado para usar novo módulo de retry
+- **Validação**:
+  - ✅ `RetryConfig` com configuração centralizada (max_attempts, backoff, jitter)
+  - ✅ `with_retry()` e `with_retry_async()` decoradores implementados
+  - ✅ `is_retryable_error()` classifica erros retentáveis
+  - ✅ `check_response_for_retry()` verifica status codes
+  - ✅ Suporte a Retry-After header (429)
+  - ✅ Jitter aleatório para evitar thundering herd
+  - ✅ Logging detalhado de cada tentativa
+  - ✅ WhatsApp e Piperun já tinham retry manual robusto (mantido)
+  - ✅ Chatwoot migrado para usar decoradores padronizados
+  - ✅ 135 testes passando (50 retry + 28 chatwoot + 6 whatsapp + 51 piperun)
 
 ---
 
-### TECH-030: Implementar fallback para falhas de CRM
+### TECH-030: Implementar fallback para falhas de CRM ✅
 
 - **Tipo**: Technical Story
 - **Descrição**: Continuar atendimento mesmo se CRM estiver indisponível, persistindo dados localmente para sincronização posterior.
 - **Critérios de Aceitação**:
-  - [ ] Se criação de oportunidade falhar após retries, dados salvos localmente
-  - [ ] Flag indicando "pendente de sincronização"
-  - [ ] Job/processo para reprocessar pendências
-  - [ ] Alerta gerado para operação
+  - [x] Se criação de oportunidade falhar após retries, dados salvos localmente
+  - [x] Flag indicando "pendente de sincronização"
+  - [x] Job/processo para reprocessar pendências
+  - [x] Alerta gerado para operação
 - **Dependências**: TECH-029, TECH-013
 - **Prioridade**: Média
 - **Fase**: Fase 2
+- **Status**: ✅ Concluído (2026-01-06)
+- **Artefatos**:
+  - `src/services/pending_operations.py` — Serviço de operações pendentes (CRUD completo)
+  - `src/services/piperun_sync.py` — Função `sync_lead_to_piperun_with_fallback()`
+  - `src/services/lead_persistence.py` — Função `update_lead_sync_status()`
+  - `src/jobs/sync_pending_operations.py` — Job de reprocessamento de pendências
+  - `src/api/routes/pending_operations.py` — Endpoints de monitoramento e reprocessamento manual
+  - `migrations/20260106_create_pending_operations.sql` — Migration para tabela e campo crm_sync_status
+  - `tests/services/test_fallback.py` — 17 testes unitários
+- **Validação**:
+  - ✅ Tabela `pending_operations` com campos id, operation_type, entity_type, payload, status, retry_count, max_retries, last_error
+  - ✅ Campo `crm_sync_status` em leads (synced, pending, failed)
+  - ✅ Operações pendentes criadas quando CRM falha após retries
+  - ✅ Job de reprocessamento com limite de 10 retries
+  - ✅ Alertas para volume alto de pendências (threshold 50) e falhas (threshold 10)
+  - ✅ Endpoints: GET /status, GET /list, GET /{id}, POST /{id}/retry, POST /{id}/reset, POST /retry-all-failed, POST /process, GET /failed/list
 
 ---
 
@@ -1090,28 +1285,6 @@ e @back
 - **Dependências**: TECH-002, TECH-007, TECH-012
 - **Prioridade**: Média
 - **Fase**: Fase 2
-
----
-
-### TECH-032: Implementar configuração de horário de atendimento e lógica de retomada
-
-- **Tipo**: Technical Story
-- **Descrição**: Implementar sistema de configuração de horário de atendimento e lógica de retomada do agente após intervenção humana, conforme decisão D7 do PRD.
-- **Critérios de Aceitação**:
-  - [ ] Arquivo de configuração de horário de atendimento (ex.: `config/horario_atendimento.yaml` ou `.env`) com:
-    - Fuso horário configurável (ex.: `America/Sao_Paulo`)
-    - Dias da semana com atendimento (ex.: segunda a sexta)
-    - Horários de início/fim por dia (ex.: 08:00-18:00)
-  - [ ] Função para verificar se está dentro do horário de atendimento
-  - [ ] Processamento de comandos do SDR (`/retomar`, `/continuar`) dentro do horário
-  - [ ] Retomada automática quando fora do horário e lead enviar nova mensagem
-  - [ ] Comandos processados pelo sistema e não aparecem como mensagem visível ao lead
-  - [ ] Logs de pausa/retomada com indicação de horário de atendimento
-- **Dependências**: TECH-001, TECH-022
-- **Prioridade**: Alta
-- **Fase**: MVP
-
----
 
 ---
 

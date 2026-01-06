@@ -8,23 +8,25 @@ Features:
 - Sync incoming/outgoing messages to Chatwoot conversations
 - Create contacts and conversations automatically
 - Send internal notes (private messages) for SDR handoff
-- Retry with exponential backoff for resilience
+- Retry with exponential backoff for resilience (TECH-029)
 """
 
 import asyncio
 import threading
+import time
 from typing import Optional
 
 import httpx
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from src.config.settings import settings
+from src.services.alerts import record_integration_result
+from src.services.metrics import record_integration_request
 from src.utils.logging import get_logger
+from src.utils.retry import (
+    RetryConfig,
+    check_response_for_retry,
+    with_retry_async,
+)
 from src.utils.validation import normalize_phone
 
 logger = get_logger(__name__)
@@ -32,32 +34,21 @@ logger = get_logger(__name__)
 # Default timeout for Chatwoot API calls (in seconds)
 CHATWOOT_TIMEOUT = 10.0
 
-# Retry configuration
-MAX_RETRY_ATTEMPTS = 3
-RETRY_MIN_WAIT = 1  # seconds
-RETRY_MAX_WAIT = 10  # seconds
+# Retry configuration for Chatwoot (TECH-029)
+CHATWOOT_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    initial_backoff=1.0,
+    max_backoff=10.0,
+    backoff_multiplier=2,
+    jitter=True,
+    retryable_status_codes=[429, 500, 502, 503, 504],
+)
 
 # Cache for conversation IDs (phone -> chatwoot_conversation_id)
 _conversation_cache: dict[str, Optional[str]] = {}
 
 
-def _create_retry_decorator():
-    """Create a retry decorator for HTTP calls with exponential backoff."""
-    return retry(
-        retry=retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)),
-        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
-        wait=wait_exponential(multiplier=1, min=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
-        before_sleep=lambda retry_state: logger.warning(
-            f"Chatwoot API call failed, retrying in {retry_state.next_action.sleep} seconds",
-            extra={
-                "attempt": retry_state.attempt_number,
-                "exception": str(retry_state.outcome.exception()) if retry_state.outcome else None,
-            },
-        ),
-    )
-
-
-@_create_retry_decorator()
+@with_retry_async(CHATWOOT_RETRY_CONFIG)
 async def _make_chatwoot_request(
     client: httpx.AsyncClient,
     method: str,
@@ -66,6 +57,9 @@ async def _make_chatwoot_request(
 ) -> httpx.Response:
     """
     Make an HTTP request to Chatwoot API with retry logic.
+
+    TECH-029: Uses standardized retry decorator with exponential backoff.
+    Retries on: timeout, connection errors, 429 (rate limit), 5xx errors.
 
     Args:
         client: httpx AsyncClient instance
@@ -79,15 +73,21 @@ async def _make_chatwoot_request(
     Raises:
         httpx.TimeoutException: After all retries exhausted
         httpx.ConnectError: After all retries exhausted
+        RetryableHTTPError: After all retries exhausted for 5xx/429
     """
     if method.upper() == "GET":
-        return await client.get(url, **kwargs)
+        response = await client.get(url, **kwargs)
     elif method.upper() == "POST":
-        return await client.post(url, **kwargs)
+        response = await client.post(url, **kwargs)
     elif method.upper() == "PUT":
-        return await client.put(url, **kwargs)
+        response = await client.put(url, **kwargs)
     else:
         raise ValueError(f"Unsupported HTTP method: {method}")
+
+    # Check for retryable HTTP errors (5xx, 429)
+    check_response_for_retry(response, CHATWOOT_RETRY_CONFIG)
+
+    return response
 
 
 async def create_chatwoot_conversation(phone: str, sender_name: Optional[str] = None) -> Optional[str]:
@@ -526,6 +526,7 @@ async def sync_message_to_chatwoot_async(
     Returns:
         True if sync was successful, False otherwise
     """
+    start_time = time.perf_counter()
     normalized_phone = normalize_phone(phone)
     if not normalized_phone:
         logger.warning(f"Invalid phone number: {phone}")
@@ -561,7 +562,18 @@ async def sync_message_to_chatwoot_async(
                 },
             )
 
+            duration = time.perf_counter() - start_time
+
             if response.status_code in (200, 201):
+                # Record success metric (TECH-023)
+                record_integration_request(
+                    integration="chatwoot",
+                    operation="sync_message",
+                    success=True,
+                    duration_seconds=duration,
+                )
+                # Record for alert monitoring (TECH-024)
+                record_integration_result("chatwoot", success=True)
                 logger.debug(
                     "Message synced to Chatwoot",
                     extra={
@@ -572,6 +584,15 @@ async def sync_message_to_chatwoot_async(
                 )
                 return True
             else:
+                # Record failure metric (TECH-023)
+                record_integration_request(
+                    integration="chatwoot",
+                    operation="sync_message",
+                    success=False,
+                    duration_seconds=duration,
+                )
+                # Record for alert monitoring (TECH-024)
+                record_integration_result("chatwoot", success=False)
                 logger.error(
                     "Failed to sync message to Chatwoot",
                     extra={
@@ -584,6 +605,16 @@ async def sync_message_to_chatwoot_async(
                 return False
 
     except Exception as e:
+        duration = time.perf_counter() - start_time
+        # Record failure metric (TECH-023)
+        record_integration_request(
+            integration="chatwoot",
+            operation="sync_message",
+            success=False,
+            duration_seconds=duration,
+        )
+        # Record for alert monitoring (TECH-024)
+        record_integration_result("chatwoot", success=False)
         logger.error(
             "Error syncing message to Chatwoot",
             extra={

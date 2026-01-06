@@ -18,6 +18,9 @@ from typing import Any
 import httpx
 
 from src.config.settings import settings
+from src.services.alerts import check_and_alert_auth_failure, record_integration_result
+from src.services.audit_trail import log_api_call_sync
+from src.services.metrics import record_integration_request
 from src.utils.logging import get_logger, log_api_call
 from src.utils.validation import normalize_cnpj, normalize_phone, normalize_uf
 
@@ -236,6 +239,15 @@ class PiperunClient:
 
                 # Success responses (200, 201)
                 if response.status_code in (200, 201):
+                    # Record success metric (TECH-023)
+                    record_integration_request(
+                        integration="piperun",
+                        operation=f"{method.lower()}_{endpoint.strip('/').split('/')[0]}",
+                        success=True,
+                        duration_seconds=duration_ms / 1000,
+                    )
+                    # Record for alert monitoring (TECH-024)
+                    record_integration_result("piperun", success=True)
                     try:
                         data = response.json()
                         logger.debug(
@@ -252,16 +264,37 @@ class PiperunClient:
 
                 # No content (204)
                 if response.status_code == 204:
+                    # Record success metric (TECH-023)
+                    record_integration_request(
+                        integration="piperun",
+                        operation=f"{method.lower()}_{endpoint.strip('/').split('/')[0]}",
+                        success=True,
+                        duration_seconds=duration_ms / 1000,
+                    )
                     return {}
 
                 # Client errors (4xx) - don't retry
                 if response.status_code == 401:
+                    # Record for alert monitoring (TECH-024)
+                    record_integration_result("piperun", success=False)
+                    await check_and_alert_auth_failure(
+                        integration="piperun",
+                        status_code=401,
+                        error_message="Authentication failed - check API token",
+                    )
                     raise PiperunAuthError(
                         "Authentication failed - check API token",
                         status_code=401,
                     )
 
                 if response.status_code == 403:
+                    # Record for alert monitoring (TECH-024)
+                    record_integration_result("piperun", success=False)
+                    await check_and_alert_auth_failure(
+                        integration="piperun",
+                        status_code=403,
+                        error_message="Access forbidden - check permissions",
+                    )
                     raise PiperunAuthError(
                         "Access forbidden - check permissions",
                         status_code=403,
@@ -372,6 +405,13 @@ class PiperunClient:
                     continue
 
         # All retries exhausted
+        # Record failure metric (TECH-023)
+        record_integration_request(
+            integration="piperun",
+            operation=f"{method.lower()}_{endpoint.strip('/').split('/')[0]}",
+            success=False,
+            duration_seconds=time.perf_counter() - (start_time if 'start_time' in dir() else time.perf_counter()),
+        )
         logger.error(
             f"Piperun API call failed after {self.max_retries} attempts",
             extra={
@@ -600,6 +640,15 @@ class PiperunClient:
                 company_data = response.get("data", {})
                 company_id = company_data.get("id")
 
+                # Audit trail (TECH-028): Log API call
+                log_api_call_sync(
+                    service="piperun",
+                    operation="create_company",
+                    entity_id=str(company_id) if company_id else None,
+                    status="success",
+                    metadata={"company_name": name},
+                )
+
                 logger.info(
                     f"Company created successfully: {name}",
                     extra={
@@ -617,12 +666,26 @@ class PiperunClient:
             return None
 
         except PiperunValidationError as e:
+            # Audit trail (TECH-028): Log failed API call
+            log_api_call_sync(
+                service="piperun",
+                operation="create_company",
+                status="error",
+                metadata={"error_type": "validation", "company_name": name},
+            )
             logger.error(
                 f"Validation error creating company: {name}",
                 extra={"error": str(e), "response_data": e.response_data},
             )
             return None
         except PiperunError as e:
+            # Audit trail (TECH-028): Log failed API call
+            log_api_call_sync(
+                service="piperun",
+                operation="create_company",
+                status="error",
+                metadata={"error_type": "piperun_error", "company_name": name},
+            )
             logger.error(
                 f"Error creating company: {name}",
                 extra={"error": str(e)},
@@ -698,6 +761,15 @@ class PiperunClient:
                 person_data = response.get("data", {})
                 person_id = person_data.get("id")
 
+                # Audit trail (TECH-028): Log API call
+                log_api_call_sync(
+                    service="piperun",
+                    operation="create_person",
+                    entity_id=str(person_id) if person_id else None,
+                    status="success",
+                    metadata={"person_name": name, "has_company": bool(company_id)},
+                )
+
                 logger.info(
                     f"Person created successfully: {name}",
                     extra={
@@ -716,12 +788,26 @@ class PiperunClient:
             return None
 
         except PiperunValidationError as e:
+            # Audit trail (TECH-028): Log failed API call
+            log_api_call_sync(
+                service="piperun",
+                operation="create_person",
+                status="error",
+                metadata={"error_type": "validation", "person_name": name},
+            )
             logger.error(
                 f"Validation error creating person: {name}",
                 extra={"error": str(e), "response_data": e.response_data},
             )
             return None
         except PiperunError as e:
+            # Audit trail (TECH-028): Log failed API call
+            log_api_call_sync(
+                service="piperun",
+                operation="create_person",
+                status="error",
+                metadata={"error_type": "piperun_error", "person_name": name},
+            )
             logger.error(
                 f"Error creating person: {name}",
                 extra={"error": str(e)},
@@ -800,6 +886,20 @@ class PiperunClient:
                 deal_data = response.get("data", {})
                 deal_id = deal_data.get("id")
 
+                # Audit trail (TECH-028): Log API call
+                log_api_call_sync(
+                    service="piperun",
+                    operation="create_deal",
+                    entity_id=str(deal_id) if deal_id else None,
+                    status="success",
+                    metadata={
+                        "deal_title": title,
+                        "pipeline_id": _pipeline_id,
+                        "has_person": bool(person_id),
+                        "has_company": bool(company_id),
+                    },
+                )
+
                 logger.info(
                     f"Deal created successfully: {title}",
                     extra={
@@ -818,12 +918,26 @@ class PiperunClient:
             return None
 
         except PiperunValidationError as e:
+            # Audit trail (TECH-028): Log failed API call
+            log_api_call_sync(
+                service="piperun",
+                operation="create_deal",
+                status="error",
+                metadata={"error_type": "validation", "deal_title": title},
+            )
             logger.error(
                 f"Validation error creating deal: {title}",
                 extra={"error": str(e), "response_data": e.response_data},
             )
             return None
         except PiperunError as e:
+            # Audit trail (TECH-028): Log failed API call
+            log_api_call_sync(
+                service="piperun",
+                operation="create_deal",
+                status="error",
+                metadata={"error_type": "piperun_error", "deal_title": title},
+            )
             logger.error(
                 f"Error creating deal: {title}",
                 extra={"error": str(e)},

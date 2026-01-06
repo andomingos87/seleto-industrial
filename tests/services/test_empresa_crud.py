@@ -30,15 +30,24 @@ def mock_supabase_client():
 @pytest.fixture
 def sample_empresa_data():
     """Sample empresa data for testing."""
+    # Note: Using valid CNPJ with correct check digits (TECH-026)
     return {
         "nome": "Empresa Teste LTDA",
         "cidade": "São Paulo",
         "uf": "SP",
-        "cnpj": "12345678000190",
+        "cnpj": "11222333000181",  # Valid CNPJ with correct check digits
         "site": "https://example.com",
         "email": "contato@example.com",
         "telefone": "5511999999999",
     }
+
+
+# Valid CNPJs for testing (with correct check digits - TECH-026)
+VALID_CNPJ_1 = "11222333000181"
+VALID_CNPJ_2 = "11444777000161"
+VALID_CNPJ_3 = "19131243000197"
+# Invalid CNPJ (wrong check digits)
+INVALID_CNPJ = "12345678000190"
 
 
 class TestCreateEmpresa:
@@ -70,7 +79,7 @@ class TestGetEmpresaByCnpj:
         eq_mock = Mock()
         eq_mock.execute.return_value = Mock(data=[{
             "id": empresa_id,
-            "cnpj": "12345678000190",
+            "cnpj": VALID_CNPJ_1,
             "nome": "Empresa Teste",
             "cidade": "São Paulo",
         }])
@@ -78,12 +87,12 @@ class TestGetEmpresaByCnpj:
         table_mock.select.return_value = select_mock
         select_mock.eq.return_value = eq_mock
 
-        result = get_empresa_by_cnpj("12345678000190")
+        result = get_empresa_by_cnpj(VALID_CNPJ_1)
 
         assert result is not None
         assert result["id"] == empresa_id
-        assert result["cnpj"] == "12345678000190"
-        select_mock.eq.assert_called_once_with("cnpj", "12345678000190")
+        assert result["cnpj"] == VALID_CNPJ_1
+        select_mock.eq.assert_called_once_with("cnpj", VALID_CNPJ_1)
 
     @patch("src.services.empresa_persistence.get_supabase_client")
     def test_returns_none_when_not_exists(self, mock_get_client, mock_supabase_client):
@@ -98,7 +107,7 @@ class TestGetEmpresaByCnpj:
         table_mock.select.return_value = select_mock
         select_mock.eq.return_value = eq_mock
 
-        result = get_empresa_by_cnpj("12345678000190")
+        result = get_empresa_by_cnpj(VALID_CNPJ_1)
 
         assert result is None
 
@@ -111,17 +120,17 @@ class TestGetEmpresaByCnpj:
         empresa_id = str(uuid4())
         select_mock = Mock()
         eq_mock = Mock()
-        eq_mock.execute.return_value = Mock(data=[{"id": empresa_id, "cnpj": "12345678000190"}])
+        eq_mock.execute.return_value = Mock(data=[{"id": empresa_id, "cnpj": VALID_CNPJ_1}])
 
         table_mock.select.return_value = select_mock
         select_mock.eq.return_value = eq_mock
 
-        # CNPJ with formatting
-        result = get_empresa_by_cnpj("12.345.678/0001-90")
+        # CNPJ with formatting (using valid CNPJ formatted)
+        result = get_empresa_by_cnpj("11.222.333/0001-81")
 
         assert result is not None
         # Verify normalized CNPJ was used in query
-        select_mock.eq.assert_called_once_with("cnpj", "12345678000190")
+        select_mock.eq.assert_called_once_with("cnpj", VALID_CNPJ_1)
 
     def test_returns_none_for_invalid_cnpj(self):
         """Test that None is returned for invalid CNPJ."""
@@ -138,7 +147,7 @@ class TestGetEmpresaByCnpj:
         """Test that None is returned when Supabase is not available."""
         mock_get_client.return_value = None
 
-        result = get_empresa_by_cnpj("12345678000190")
+        result = get_empresa_by_cnpj(VALID_CNPJ_1)
 
         assert result is None
 
@@ -155,7 +164,7 @@ class TestGetEmpresaByCnpj:
         table_mock.select.return_value = select_mock
         select_mock.eq.return_value = eq_mock
 
-        result = get_empresa_by_cnpj("12345678000190")
+        result = get_empresa_by_cnpj(VALID_CNPJ_1)
 
         assert result is None
 
@@ -205,21 +214,21 @@ class TestUpdateEmpresa:
         update_mock = Mock()
         eq_mock = Mock()
         execute_mock = Mock()
-        execute_mock.data = [{"id": empresa_id, "cnpj": "12345678000190"}]
+        execute_mock.data = [{"id": empresa_id, "cnpj": VALID_CNPJ_1}]
         eq_mock.execute.return_value = execute_mock
 
         table_mock.update.return_value = update_mock
         update_mock.eq.return_value = eq_mock
 
-        # CNPJ with formatting
+        # CNPJ with formatting (using valid CNPJ formatted)
         result = update_empresa(empresa_id, {
-            "cnpj": "12.345.678/0001-90",
+            "cnpj": "11.222.333/0001-81",
         })
 
         assert result is not None
         # Verify normalized CNPJ was used
         call_args = table_mock.update.call_args
-        assert call_args[0][0]["cnpj"] == "12345678000190"
+        assert call_args[0][0]["cnpj"] == VALID_CNPJ_1
 
     @patch("src.services.empresa_persistence.get_supabase_client")
     def test_doesnt_overwrite_fields_with_null(self, mock_get_client, mock_supabase_client):
@@ -372,12 +381,12 @@ class TestEmpresaDeduplication:
         # Try to create with different CNPJ format (should be recognized as duplicate)
         result = create_empresa({
             "nome": "Empresa Teste",
-            "cnpj": "12.345.678/0001-90",  # Different format, same CNPJ
+            "cnpj": "11.222.333/0001-81",  # Different format, same CNPJ (valid)
         })
 
         assert result is None
         # Verify check was done with normalized CNPJ
-        select_mock.eq.assert_called_with("cnpj", "12345678000190")
+        select_mock.eq.assert_called_with("cnpj", VALID_CNPJ_1)
 
 
 class TestEmpresaNormalization:
@@ -401,21 +410,22 @@ class TestEmpresaNormalization:
         # Mock insert
         insert_mock = Mock()
         execute_mock = Mock()
-        execute_mock.data = [{"id": empresa_id, "cnpj": "12345678000190"}]
+        execute_mock.data = [{"id": empresa_id, "cnpj": VALID_CNPJ_1}]
         insert_mock.execute.return_value = execute_mock
         table_mock.insert.return_value = insert_mock
 
-        # Test various CNPJ formats
+        # Test various CNPJ formats (all normalize to VALID_CNPJ_1)
+        # Using valid CNPJ 11222333000181 in different formats
         formats = [
-            "12.345.678/0001-90",
-            "12345678/0001-90",
-            "12345678000190",
+            "11.222.333/0001-81",  # Fully formatted
+            "11222333/0001-81",    # Partially formatted
+            VALID_CNPJ_1,          # Digits only
         ]
 
         for cnpj_format in formats:
             create_empresa({"nome": "Test", "cnpj": cnpj_format})
             call_args = table_mock.insert.call_args
-            assert call_args[0][0]["cnpj"] == "12345678000190"
+            assert call_args[0][0]["cnpj"] == VALID_CNPJ_1
 
     @patch("src.services.empresa_persistence.get_supabase_client")
     def test_cnpj_normalization_in_get_empresa_by_cnpj(self, mock_get_client, mock_supabase_client):
@@ -426,21 +436,22 @@ class TestEmpresaNormalization:
         empresa_id = str(uuid4())
         select_mock = Mock()
         eq_mock = Mock()
-        eq_mock.execute.return_value = Mock(data=[{"id": empresa_id, "cnpj": "12345678000190"}])
+        eq_mock.execute.return_value = Mock(data=[{"id": empresa_id, "cnpj": VALID_CNPJ_1}])
 
         table_mock.select.return_value = select_mock
         select_mock.eq.return_value = eq_mock
 
-        # Test various CNPJ formats
+        # Test various CNPJ formats (all normalize to VALID_CNPJ_1)
+        # Using valid CNPJ 11222333000181 in different formats
         formats = [
-            "12.345.678/0001-90",
-            "12345678/0001-90",
-            "12345678000190",
+            "11.222.333/0001-81",  # Fully formatted
+            "11222333/0001-81",    # Partially formatted
+            VALID_CNPJ_1,          # Digits only
         ]
 
         for cnpj_format in formats:
             get_empresa_by_cnpj(cnpj_format)
-            select_mock.eq.assert_called_with("cnpj", "12345678000190")
+            select_mock.eq.assert_called_with("cnpj", VALID_CNPJ_1)
 
     @patch("src.services.empresa_persistence.get_supabase_client")
     def test_cnpj_normalization_in_update_empresa(self, mock_get_client, mock_supabase_client):
@@ -452,21 +463,21 @@ class TestEmpresaNormalization:
         update_mock = Mock()
         eq_mock = Mock()
         execute_mock = Mock()
-        execute_mock.data = [{"id": empresa_id, "cnpj": "12345678000190"}]
+        execute_mock.data = [{"id": empresa_id, "cnpj": VALID_CNPJ_1}]
         eq_mock.execute.return_value = execute_mock
 
         table_mock.update.return_value = update_mock
         update_mock.eq.return_value = eq_mock
 
-        # CNPJ with formatting
+        # CNPJ with formatting (using valid CNPJ formatted)
         result = update_empresa(empresa_id, {
-            "cnpj": "12.345.678/0001-90",
+            "cnpj": "11.222.333/0001-81",
         })
 
         assert result is not None
         # Verify normalized CNPJ was used
         call_args = table_mock.update.call_args
-        assert call_args[0][0]["cnpj"] == "12345678000190"
+        assert call_args[0][0]["cnpj"] == VALID_CNPJ_1
 
     def test_invalid_cnpj_formats_handled_correctly(self):
         """Test that invalid CNPJ formats are handled correctly."""
@@ -490,7 +501,7 @@ class TestEmpresaErrorHandling:
         result = create_empresa({"nome": "Test"})
         assert result is None
 
-        result = get_empresa_by_cnpj("12345678000190")
+        result = get_empresa_by_cnpj(VALID_CNPJ_1)
         assert result is None
 
         result = update_empresa(str(uuid4()), {"nome": "Test"})
@@ -515,7 +526,7 @@ class TestEmpresaErrorHandling:
 
         table_mock.insert.return_value = insert_mock
 
-        result = create_empresa({"nome": "Test", "cnpj": "12345678000190"})
+        result = create_empresa({"nome": "Test", "cnpj": VALID_CNPJ_1})
         assert result is None
 
 
@@ -530,7 +541,7 @@ class TestEmpresaIntegration:
         mock_get_client.return_value = client
 
         empresa_id = str(uuid4())
-        test_cnpj = "12345678000190"
+        test_cnpj = VALID_CNPJ_1
 
         # Track which select call we're on
         select_call_count = [0]
@@ -609,7 +620,7 @@ class TestEmpresaIntegration:
         mock_get_client.return_value = client
 
         existing_empresa_id = str(uuid4())
-        test_cnpj = "12345678000190"
+        test_cnpj = VALID_CNPJ_1
 
         # Mock check for existing empresa (found existing)
         select_mock = Mock()

@@ -10,9 +10,14 @@ This service provides CRUD operations for empresa table (TECH-014):
 from datetime import datetime
 from typing import Dict, Optional, Any
 
+from src.services.audit_trail import (
+    EntityType,
+    log_entity_create_sync,
+    log_entity_update_sync,
+)
 from src.services.conversation_persistence import get_supabase_client
 from src.utils.logging import get_logger
-from src.utils.validation import normalize_cnpj
+from src.utils.validation import normalize_cnpj, validate_cnpj
 
 logger = get_logger(__name__)
 
@@ -88,13 +93,12 @@ def create_empresa(data: Dict[str, Optional[Any]]) -> Optional[Dict[str, Any]]:
 
             normalized_cnpj = normalize_cnpj(cnpj)
 
-            # Validate CNPJ has 14 digits
-            if len(normalized_cnpj) != 14:
+            # Validate CNPJ format and check digits (TECH-026)
+            if not validate_cnpj(normalized_cnpj):
                 logger.warning(
-                    "Invalid CNPJ format - must have 14 digits after normalization",
+                    "Invalid CNPJ format - check digits validation failed",
                     extra={
-                        "cnpj": cnpj,
-                        "normalized_cnpj": normalized_cnpj,
+                        "cnpj_masked": f"{normalized_cnpj[:2]}...{normalized_cnpj[-2:]}" if len(normalized_cnpj) > 4 else normalized_cnpj,
                         "operation": "create_empresa",
                     },
                 )
@@ -139,10 +143,19 @@ def create_empresa(data: Dict[str, Optional[Any]]) -> Optional[Dict[str, Any]]:
 
         if response.data and len(response.data) > 0:
             empresa = response.data[0]
+            empresa_id = empresa.get("id")
+
+            # Audit trail (TECH-028): Log CREATE
+            log_entity_create_sync(
+                entity_type=EntityType.EMPRESA,
+                entity_id=str(empresa_id),
+                data=empresa,
+            )
+
             logger.info(
                 "Empresa created successfully",
                 extra={
-                    "empresa_id": empresa.get("id"),
+                    "empresa_id": empresa_id,
                     "cnpj": normalized_cnpj,
                     "fields": list(filtered_data.keys()),
                     "operation": "create_empresa",
@@ -200,12 +213,13 @@ def get_empresa_by_cnpj(cnpj: str) -> Optional[Dict[str, Any]]:
         return None
 
     normalized_cnpj = normalize_cnpj(cnpj)
+    # For retrieval, we only require 14 digits (no check digit validation)
+    # This allows finding empresas even if the CNPJ was stored before validation was added
     if not normalized_cnpj or len(normalized_cnpj) != 14:
         logger.warning(
             "Invalid CNPJ format - must have 14 digits after normalization",
             extra={
-                "cnpj": cnpj,
-                "normalized_cnpj": normalized_cnpj,
+                "cnpj_masked": f"{normalized_cnpj[:2]}...{normalized_cnpj[-2:]}" if len(normalized_cnpj) > 4 else normalized_cnpj,
                 "operation": "get_empresa_by_cnpj",
             },
         )
@@ -321,6 +335,21 @@ def update_empresa(empresa_id: str, data: Dict[str, Optional[Any]]) -> Optional[
         return None
 
     try:
+        # Get existing empresa for audit trail (before state)
+        existing_empresa = None
+        try:
+            existing_response = (
+                client.table("empresa")
+                .select("*")
+                .eq("id", empresa_id)
+                .execute()
+            )
+            if existing_response.data and len(existing_response.data) > 0:
+                existing_empresa = existing_response.data[0]
+        except Exception:
+            # If we can't get existing, continue with update
+            pass
+
         # Filter out None/null values for partial updates
         filtered_data = {k: v for k, v in data.items() if v is not None}
 
@@ -331,22 +360,21 @@ def update_empresa(empresa_id: str, data: Dict[str, Optional[Any]]) -> Optional[
             )
             return None
 
-        # Normalize CNPJ if provided
+        # Normalize and validate CNPJ if provided (TECH-026)
         if "cnpj" in filtered_data:
             normalized_cnpj = normalize_cnpj(str(filtered_data["cnpj"]))
-            
-            # Validate CNPJ has 14 digits
-            if len(normalized_cnpj) != 14:
+
+            # Validate CNPJ format and check digits
+            if not validate_cnpj(normalized_cnpj):
                 logger.warning(
-                    "Invalid CNPJ format - must have 14 digits after normalization",
+                    "Invalid CNPJ format - check digits validation failed",
                     extra={
-                        "cnpj": filtered_data["cnpj"],
-                        "normalized_cnpj": normalized_cnpj,
+                        "cnpj_masked": f"{normalized_cnpj[:2]}...{normalized_cnpj[-2:]}" if len(normalized_cnpj) > 4 else normalized_cnpj,
                         "operation": "update_empresa",
                     },
                 )
                 return None
-            
+
             filtered_data["cnpj"] = normalized_cnpj
 
         # Add updated_at timestamp
@@ -362,6 +390,16 @@ def update_empresa(empresa_id: str, data: Dict[str, Optional[Any]]) -> Optional[
 
         if response.data and len(response.data) > 0:
             empresa = response.data[0]
+
+            # Audit trail (TECH-028): Log UPDATE
+            if existing_empresa:
+                log_entity_update_sync(
+                    entity_type=EntityType.EMPRESA,
+                    entity_id=str(empresa_id),
+                    old_data=existing_empresa,
+                    new_data=empresa,
+                )
+
             logger.info(
                 "Empresa updated successfully",
                 extra={

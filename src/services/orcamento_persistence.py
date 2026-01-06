@@ -11,6 +11,11 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from uuid import UUID
 
+from src.services.audit_trail import (
+    EntityType,
+    log_entity_create_sync,
+    log_entity_update_sync,
+)
 from src.services.conversation_persistence import get_supabase_client
 from src.utils.logging import get_logger
 
@@ -107,11 +112,20 @@ def create_orcamento(lead_id: str, data: Dict[str, Optional[Any]]) -> Optional[D
 
         if response.data and len(response.data) > 0:
             orcamento = response.data[0]
+            orcamento_id = orcamento.get("id")
+
+            # Audit trail (TECH-028): Log CREATE
+            log_entity_create_sync(
+                entity_type=EntityType.ORCAMENTO,
+                entity_id=str(orcamento_id),
+                data=orcamento,
+            )
+
             logger.info(
                 "Orcamento created successfully",
                 extra={
                     "lead_id": lead_id,
-                    "orcamento_id": orcamento.get("id"),
+                    "orcamento_id": orcamento_id,
                     "fields": list(filtered_data.keys()),
                     "operation": "create_orcamento",
                 },
@@ -268,6 +282,21 @@ def update_orcamento(orcamento_id: str, data: Dict[str, Optional[Any]]) -> Optio
         return None
 
     try:
+        # Get existing orcamento for audit trail (before state)
+        existing_orcamento = None
+        try:
+            existing_response = (
+                client.table("orcamentos")
+                .select("*")
+                .eq("id", orcamento_id)
+                .execute()
+            )
+            if existing_response.data and len(existing_response.data) > 0:
+                existing_orcamento = existing_response.data[0]
+        except Exception:
+            # If we can't get existing, continue with update
+            pass
+
         # Filter out None/null values for partial updates
         filtered_data = {k: v for k, v in data.items() if v is not None}
 
@@ -291,6 +320,16 @@ def update_orcamento(orcamento_id: str, data: Dict[str, Optional[Any]]) -> Optio
 
         if response.data and len(response.data) > 0:
             orcamento = response.data[0]
+
+            # Audit trail (TECH-028): Log UPDATE
+            if existing_orcamento:
+                log_entity_update_sync(
+                    entity_type=EntityType.ORCAMENTO,
+                    entity_id=str(orcamento_id),
+                    old_data=existing_orcamento,
+                    new_data=orcamento,
+                )
+
             logger.info(
                 "Orcamento updated successfully",
                 extra={

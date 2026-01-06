@@ -109,6 +109,7 @@ For full integration (MVP):
 | `POST /webhook/text` | Text message webhook (Z-API) |
 | `POST /webhook/audio` | Audio message webhook (Z-API) |
 | `POST /webhook/chatwoot` | Chatwoot webhook (SDR intervention) |
+| `GET /metrics` | Prometheus metrics (TECH-023) |
 | `GET /docs` | Swagger UI |
 
 ## Key Implementation Notes
@@ -121,8 +122,56 @@ For full integration (MVP):
 6. **Handoff Summary** - Structured summary sent to Chatwoot as internal note when lead is classified as "quente" (hot).
 7. **Business Hours** - Configured in `config/business_hours.yaml` (default: Mon-Fri 08:00-18:00 America/Sao_Paulo).
 
+## Observability (Epic 8)
+
+### Metrics (TECH-023)
+- **Endpoint**: `GET /metrics` - Prometheus format
+- **Module**: `src/services/metrics.py`
+- **Metrics**:
+  - `http_requests_total` - HTTP requests by endpoint/method/status
+  - `http_request_duration_seconds` - Latency histogram (P50, P95, P99)
+  - `integration_requests_total` - Integration calls by service/status
+  - `integration_request_duration_seconds` - Integration latency
+
+### Alerts (TECH-024)
+- **Module**: `src/services/alerts.py`
+- **Alert Types**:
+  - Error rate > 10% (5-minute window)
+  - Latency P95 > 10s
+  - Auth failures (401/403)
+- **Notifications**: Slack webhook, email, generic webhook
+- **Config**: `ALERT_*` environment variables
+
+### Runbooks (TECH-025)
+- **Location**: `documentation/runbooks/`
+- Pausar/Retomar Agente
+- Rotacionar Credenciais
+- Reprocessar Mensagens
+- Atualizar Base de Conhecimento
+- Verificar Saúde do Sistema
+
+## Security & Compliance (Epic 9)
+
+### Audit Trail (TECH-028)
+- **Module**: `src/services/audit_trail.py`
+- **Table**: `audit_logs` (requires migration: `migrations/001_create_audit_logs_table.sql`)
+- **Features**:
+  - Logs CRUD operations on leads, orcamentos, empresas
+  - Logs API calls to external services (Piperun CRM)
+  - Sensitive data masking (phone, email, CNPJ, tokens)
+  - Configurable retention (`AUDIT_RETENTION_DAYS`, default 90 days)
+  - Before/after diff for UPDATE operations
+- **Functions**:
+  - `log_entity_create_sync()` - Log CREATE operations
+  - `log_entity_update_sync()` - Log UPDATE with diff
+  - `log_api_call_sync()` - Log external API calls
+  - `mask_sensitive_data()` - Mask PII before logging
+  - `get_audit_logs()` - Query audit logs with filters
+  - `cleanup_old_audit_logs()` - Retention cleanup
+
 ## Documentation
 
 - `.context/docs/` - Architecture, workflows, security docs
 - `documentation/` - Project planning and requirements
+- `documentation/runbooks/` - Operational runbooks
 - `prompts/` - Agent prompts and product info

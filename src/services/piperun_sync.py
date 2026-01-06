@@ -5,8 +5,12 @@ US-007: Integrates lead qualification flow with Piperun CRM.
 Handles automatic creation of companies, persons, deals, and notes
 when leads are qualified.
 
+TECH-030: Added fallback mechanism for CRM failures.
+When CRM is unavailable, operations are stored locally for later sync.
+
 This module provides:
 - sync_lead_to_piperun: Main function to sync qualified leads to CRM
+- sync_lead_to_piperun_with_fallback: Sync with fallback to pending operations
 - get_or_create_company: Deduplicated company creation by CNPJ
 - build_deal_title: Generate deal title from lead data
 - Idempotency: Checks for existing opportunity before creating new one
@@ -14,10 +18,17 @@ This module provides:
 
 from typing import Any
 
-from src.services.lead_persistence import get_lead_by_phone
+from src.services.lead_persistence import get_lead_by_phone, update_lead_sync_status
 from src.services.orcamento_persistence import (
     get_orcamentos_by_lead,
     update_orcamento,
+)
+from src.services.pending_operations import (
+    EntityType as PendingEntityType,
+)
+from src.services.pending_operations import (
+    OperationType,
+    create_pending_operation,
 )
 from src.services.piperun_client import (
     PiperunClient,
@@ -27,6 +38,11 @@ from src.services.piperun_client import (
 )
 from src.utils.logging import get_logger
 from src.utils.validation import normalize_phone, normalize_uf
+
+# Sync status constants
+SYNC_STATUS_SYNCED = "synced"
+SYNC_STATUS_PENDING = "pending"
+SYNC_STATUS_FAILED = "failed"
 
 logger = get_logger(__name__)
 
@@ -506,3 +522,187 @@ def should_sync_to_piperun(
         return has_name and has_product
 
     return False
+
+
+async def sync_lead_to_piperun_with_fallback(
+    phone: str,
+    lead_data: dict[str, Any] | None = None,
+    orcamento_id: str | None = None,
+    conversation_summary: str | None = None,
+    force_create: bool = False,
+    client: PiperunClient | None = None,
+) -> dict[str, Any]:
+    """
+    Synchronize lead to Piperun with fallback to pending operations.
+
+    TECH-030: If CRM sync fails after retries, stores operation locally
+    for later synchronization.
+
+    Args:
+        phone: Lead phone number (required)
+        lead_data: Lead data dictionary (optional)
+        orcamento_id: Specific orcamento ID to update (optional)
+        conversation_summary: Summary of conversation for note (optional)
+        force_create: If True, create even if opportunity already exists
+        client: PiperunClient instance (optional)
+
+    Returns:
+        Dictionary with sync result:
+        - success: True if synced successfully
+        - deal_id: Deal ID if created (None if pending)
+        - status: 'synced', 'pending', or 'failed'
+        - pending_operation_id: ID of pending operation if created
+        - error: Error message if failed
+    """
+    normalized_phone = normalize_phone(phone)
+    if not normalized_phone:
+        return {
+            "success": False,
+            "deal_id": None,
+            "status": SYNC_STATUS_FAILED,
+            "pending_operation_id": None,
+            "error": f"Invalid phone: {phone}",
+        }
+
+    # Fetch lead data if not provided (for payload)
+    if not lead_data:
+        lead_data = get_lead_by_phone(normalized_phone) or {}
+
+    lead_id = lead_data.get("id")
+
+    try:
+        # Try to sync to Piperun
+        deal_id = await sync_lead_to_piperun(
+            phone=phone,
+            lead_data=lead_data,
+            orcamento_id=orcamento_id,
+            conversation_summary=conversation_summary,
+            force_create=force_create,
+            client=client,
+        )
+
+        if deal_id:
+            # Success - update lead sync status
+            if lead_id:
+                update_lead_sync_status(normalized_phone, SYNC_STATUS_SYNCED)
+
+            logger.info(
+                "Lead synced to Piperun successfully",
+                extra={"phone": normalized_phone, "deal_id": deal_id},
+            )
+
+            return {
+                "success": True,
+                "deal_id": deal_id,
+                "status": SYNC_STATUS_SYNCED,
+                "pending_operation_id": None,
+                "error": None,
+            }
+        else:
+            # No deal created (maybe not configured)
+            logger.warning(
+                "Piperun sync returned no deal ID",
+                extra={"phone": normalized_phone},
+            )
+            return {
+                "success": False,
+                "deal_id": None,
+                "status": SYNC_STATUS_FAILED,
+                "pending_operation_id": None,
+                "error": "No deal ID returned from Piperun",
+            }
+
+    except (PiperunSyncError, PiperunError) as e:
+        # CRM failed - create pending operation for later retry
+        logger.warning(
+            "Piperun sync failed, creating pending operation",
+            extra={
+                "phone": normalized_phone,
+                "error": str(e),
+                "step": getattr(e, "step", None),
+            },
+        )
+
+        try:
+            # Build payload for pending operation
+            payload = {
+                "phone": normalized_phone,
+                "lead_data": lead_data,
+                "orcamento_id": orcamento_id,
+                "conversation_summary": conversation_summary,
+                "force_create": force_create,
+                "original_error": str(e),
+                "error_step": getattr(e, "step", None),
+            }
+
+            # Create pending operation
+            pending_op = await create_pending_operation(
+                operation_type=OperationType.CREATE_DEAL,
+                entity_type=PendingEntityType.DEAL,
+                payload=payload,
+                entity_id=lead_id,
+            )
+
+            pending_op_id = pending_op.get("id") if pending_op else None
+
+            # Update lead sync status to pending
+            if lead_id:
+                update_lead_sync_status(normalized_phone, SYNC_STATUS_PENDING)
+
+            logger.info(
+                "Created pending operation for Piperun sync",
+                extra={
+                    "phone": normalized_phone,
+                    "pending_operation_id": pending_op_id,
+                },
+            )
+
+            return {
+                "success": False,
+                "deal_id": None,
+                "status": SYNC_STATUS_PENDING,
+                "pending_operation_id": pending_op_id,
+                "error": str(e),
+            }
+
+        except Exception as pending_error:
+            # Failed to create pending operation
+            logger.error(
+                "Failed to create pending operation",
+                extra={
+                    "phone": normalized_phone,
+                    "error": str(pending_error),
+                },
+            )
+
+            # Update lead sync status to failed
+            if lead_id:
+                update_lead_sync_status(normalized_phone, SYNC_STATUS_FAILED)
+
+            return {
+                "success": False,
+                "deal_id": None,
+                "status": SYNC_STATUS_FAILED,
+                "pending_operation_id": None,
+                "error": f"Sync failed and could not create pending operation: {str(e)}",
+            }
+
+    except Exception as e:
+        # Unexpected error
+        logger.error(
+            "Unexpected error in Piperun sync with fallback",
+            extra={"phone": normalized_phone, "error": str(e)},
+            exc_info=True,
+        )
+
+        # Update lead sync status to failed
+        if lead_id:
+            update_lead_sync_status(normalized_phone, SYNC_STATUS_FAILED)
+
+        return {
+            "success": False,
+            "deal_id": None,
+            "status": SYNC_STATUS_FAILED,
+            "pending_operation_id": None,
+            "error": str(e),
+        }

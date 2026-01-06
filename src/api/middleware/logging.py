@@ -1,7 +1,8 @@
 """
 Logging middleware for FastAPI.
 
-Provides request/response logging with contextual information.
+Provides request/response logging with contextual information
+and Prometheus metrics collection (TECH-023).
 """
 
 import time
@@ -11,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from src.services.metrics import record_http_request
 from src.utils.logging import (
     clear_context,
     get_logger,
@@ -108,6 +110,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         # Calculate duration
         duration_ms = (time.perf_counter() - start_time) * 1000
+        duration_seconds = duration_ms / 1000
+
+        # Record Prometheus metrics (TECH-023)
+        record_http_request(
+            endpoint=request.url.path,
+            method=request.method,
+            status_code=response.status_code,
+            duration_seconds=duration_seconds,
+        )
 
         # Log response
         if is_webhook:

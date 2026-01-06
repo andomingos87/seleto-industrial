@@ -10,8 +10,13 @@ CRUD operations for leads table (TECH-012):
 """
 
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Any
 
+from src.services.audit_trail import (
+    EntityType,
+    log_entity_create_sync,
+    log_entity_update_sync,
+)
 from src.services.conversation_memory import conversation_memory
 from src.services.conversation_persistence import get_supabase_client
 from src.utils.logging import get_logger
@@ -20,7 +25,7 @@ from src.utils.validation import normalize_phone, validate_phone
 logger = get_logger(__name__)
 
 
-async def persist_lead_data(phone: str, data: Dict[str, Optional[str]]) -> bool:
+async def persist_lead_data(phone: str, data: dict[str, str | None]) -> bool:
     """
     Persist lead data (partial or complete) to storage.
 
@@ -67,7 +72,7 @@ async def persist_lead_data(phone: str, data: Dict[str, Optional[str]]) -> bool:
         return False
 
 
-def get_persisted_lead_data(phone: str) -> Dict[str, Optional[str]]:
+def get_persisted_lead_data(phone: str) -> dict[str, str | None]:
     """
     Get persisted lead data for a phone number.
 
@@ -89,7 +94,7 @@ def get_persisted_lead_data(phone: str) -> Dict[str, Optional[str]]:
     return lead_data
 
 
-def upsert_lead(phone: str, data: Dict[str, Optional[Any]]) -> Optional[Dict[str, Any]]:
+def upsert_lead(phone: str, data: dict[str, Any | None]) -> dict[str, Any] | None:
     """
     Create or update a lead in Supabase with idempotency by phone.
 
@@ -151,6 +156,21 @@ def upsert_lead(phone: str, data: Dict[str, Optional[Any]]) -> Optional[Dict[str
         return None
 
     try:
+        # Check if lead already exists (for audit trail - CREATE vs UPDATE)
+        existing_lead = None
+        try:
+            existing_response = (
+                client.table("leads")
+                .select("*")
+                .eq("phone", normalized_phone)
+                .execute()
+            )
+            if existing_response.data and len(existing_response.data) > 0:
+                existing_lead = existing_response.data[0]
+        except Exception:
+            # If we can't check, continue with upsert (audit will be CREATE)
+            pass
+
         # Filter out None/null values for partial updates
         # This ensures existing fields are not overwritten with null
         filtered_data = {k: v for k, v in data.items() if v is not None}
@@ -171,13 +191,31 @@ def upsert_lead(phone: str, data: Dict[str, Optional[Any]]) -> Optional[Dict[str
 
         if response.data and len(response.data) > 0:
             lead = response.data[0]
+            lead_id = lead.get("id")
+
+            # Audit trail (TECH-028): Log CREATE or UPDATE
+            if existing_lead:
+                log_entity_update_sync(
+                    entity_type=EntityType.LEAD,
+                    entity_id=str(lead_id),
+                    old_data=existing_lead,
+                    new_data=lead,
+                )
+            else:
+                log_entity_create_sync(
+                    entity_type=EntityType.LEAD,
+                    entity_id=str(lead_id),
+                    data=lead,
+                )
+
             logger.info(
                 "Lead upserted successfully",
                 extra={
                     "phone": normalized_phone,
-                    "lead_id": lead.get("id"),
+                    "lead_id": lead_id,
                     "fields_updated": list(filtered_data.keys()),
                     "operation": "upsert_lead",
+                    "audit_action": "UPDATE" if existing_lead else "CREATE",
                 },
             )
             return lead
@@ -201,7 +239,7 @@ def upsert_lead(phone: str, data: Dict[str, Optional[Any]]) -> Optional[Dict[str
         return None
 
 
-def get_lead_by_phone(phone: str) -> Optional[Dict[str, Any]]:
+def get_lead_by_phone(phone: str) -> dict[str, Any] | None:
     """
     Get a lead by phone number from Supabase.
 
@@ -293,4 +331,86 @@ def get_lead_by_phone(phone: str) -> Optional[Dict[str, Any]]:
             exc_info=True,
         )
         return None
+
+
+def update_lead_sync_status(phone: str, status: str) -> bool:
+    """
+    Update the CRM sync status of a lead (TECH-030).
+
+    Args:
+        phone: Phone number (will be normalized)
+        status: Sync status ('synced', 'pending', 'failed')
+
+    Returns:
+        True if updated successfully, False otherwise
+    """
+    valid_statuses = ("synced", "pending", "failed")
+    if status not in valid_statuses:
+        logger.warning(
+            f"Invalid sync status: {status}. Must be one of {valid_statuses}",
+            extra={"phone": phone, "status": status},
+        )
+        return False
+
+    normalized_phone = normalize_phone(phone)
+    if not normalized_phone:
+        logger.warning(
+            "Invalid phone number for update_lead_sync_status",
+            extra={"phone": phone, "operation": "update_lead_sync_status"},
+        )
+        return False
+
+    try:
+        client = get_supabase_client()
+    except Exception as e:
+        logger.error(
+            "Failed to get Supabase client",
+            extra={"error": str(e), "operation": "update_lead_sync_status"},
+        )
+        return False
+
+    if not client:
+        logger.debug(
+            "Supabase not available - skipping sync status update",
+            extra={"phone": normalized_phone, "operation": "update_lead_sync_status"},
+        )
+        return False
+
+    try:
+        response = (
+            client.table("leads")
+            .update({"crm_sync_status": status})
+            .eq("phone", normalized_phone)
+            .execute()
+        )
+
+        if response.data and len(response.data) > 0:
+            logger.info(
+                "Lead sync status updated",
+                extra={
+                    "phone": normalized_phone,
+                    "status": status,
+                    "operation": "update_lead_sync_status",
+                },
+            )
+            return True
+        else:
+            logger.warning(
+                "Lead not found for sync status update",
+                extra={"phone": normalized_phone, "operation": "update_lead_sync_status"},
+            )
+            return False
+
+    except Exception as e:
+        logger.error(
+            "Failed to update lead sync status",
+            extra={
+                "phone": normalized_phone,
+                "status": status,
+                "error": str(e),
+                "operation": "update_lead_sync_status",
+            },
+            exc_info=True,
+        )
+        return False
 

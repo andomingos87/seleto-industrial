@@ -17,7 +17,7 @@ from src.services.chatwoot_sync import (
     _get_or_create_chatwoot_contact,
     _make_chatwoot_request,
     CHATWOOT_TIMEOUT,
-    MAX_RETRY_ATTEMPTS,
+    CHATWOOT_RETRY_CONFIG,
 )
 from src.config.settings import settings
 
@@ -409,15 +409,25 @@ class TestSyncMessageAsync:
 
 
 class TestRetryConfiguration:
-    """Tests for retry configuration and constants."""
+    """Tests for retry configuration and constants (TECH-029)."""
 
     def test_timeout_constant_is_defined(self):
         """Test that timeout constant is properly defined."""
         assert CHATWOOT_TIMEOUT == 10.0
 
-    def test_max_retry_attempts_is_defined(self):
-        """Test that max retry attempts constant is properly defined."""
-        assert MAX_RETRY_ATTEMPTS == 3
+    def test_retry_config_is_defined(self):
+        """Test that retry configuration is properly defined."""
+        assert CHATWOOT_RETRY_CONFIG.max_attempts == 3
+        assert CHATWOOT_RETRY_CONFIG.initial_backoff == 1.0
+        assert CHATWOOT_RETRY_CONFIG.max_backoff == 10.0
+
+    def test_retry_config_has_retryable_status_codes(self):
+        """Test that retry config includes proper status codes."""
+        assert 429 in CHATWOOT_RETRY_CONFIG.retryable_status_codes
+        assert 500 in CHATWOOT_RETRY_CONFIG.retryable_status_codes
+        assert 502 in CHATWOOT_RETRY_CONFIG.retryable_status_codes
+        assert 503 in CHATWOOT_RETRY_CONFIG.retryable_status_codes
+        assert 504 in CHATWOOT_RETRY_CONFIG.retryable_status_codes
 
     def test_make_chatwoot_request_exists(self):
         """Test that _make_chatwoot_request function exists and is decorated."""

@@ -67,5 +67,26 @@ class Settings(BaseSettings):
     BUSINESS_HOURS_END: str | None = None  # e.g., "18:00" (applies to all days)
     # Note: For detailed per-day configuration, use config/business_hours.yaml
 
+    # Alerts (TECH-024)
+    ALERT_SLACK_WEBHOOK_URL: str | None = None  # Slack incoming webhook URL
+    ALERT_WEBHOOK_URL: str | None = None  # Generic webhook URL for alerts
+    ALERT_EMAIL_SMTP_HOST: str | None = None  # SMTP server hostname
+    ALERT_EMAIL_SMTP_PORT: int = 587  # SMTP server port
+    ALERT_EMAIL_FROM: str | None = None  # Sender email address
+    ALERT_EMAIL_TO: str | None = None  # Recipient email address
+    ALERT_ERROR_RATE_THRESHOLD: float = 0.10  # Error rate threshold (10%)
+    ALERT_LATENCY_THRESHOLD_SECONDS: float = 10.0  # P95 latency threshold
+    ALERT_CHECK_INTERVAL_SECONDS: int = 60  # How often to check for alerts
+    ALERT_DEBOUNCE_MINUTES: int = 15  # Minimum time between same alerts
+
+    # Audit Trail (TECH-028)
+    AUDIT_RETENTION_DAYS: int = 90  # Days to retain audit logs
+
+    # Data Retention / LGPD (TECH-031)
+    TRANSCRIPT_RETENTION_DAYS: int = 90  # Days to retain conversation messages/transcripts
+    CONTEXT_RETENTION_DAYS: int = 90  # Days to retain conversation context
+    LEAD_INACTIVITY_DAYS: int = 365  # Days of inactivity before lead anonymization
+    PENDING_OPERATIONS_RETENTION_DAYS: int = 7  # Days to retain completed pending operations
+
 
 settings = Settings()

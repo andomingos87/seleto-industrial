@@ -9,6 +9,8 @@ from typing import Optional
 
 import httpx
 from src.config.settings import settings
+from src.services.alerts import check_and_alert_auth_failure, record_integration_result
+from src.services.metrics import record_integration_request
 from src.utils.logging import get_logger, log_api_call, set_phone
 from src.utils.validation import normalize_phone
 
@@ -172,6 +174,18 @@ class WhatsAppService:
                         # #region debug instrumentation
                         _debug_log("whatsapp.py:134", "SUCCESS - message sent", {"phone": normalized_phone, "status_code": response.status_code, "attempt": attempt + 1}, "D")
                         # #endregion
+
+                        # Record success metric (TECH-023)
+                        record_integration_request(
+                            integration="whatsapp",
+                            operation="send_message",
+                            success=True,
+                            duration_seconds=duration_ms / 1000,
+                        )
+
+                        # Record for alert monitoring (TECH-024)
+                        record_integration_result("whatsapp", success=True)
+
                         logger.info(
                             "Z-API message sent successfully",
                             extra={
@@ -194,6 +208,25 @@ class WhatsAppService:
                         # #region debug instrumentation
                         _debug_log("whatsapp.py:146", "CLIENT ERROR (4xx)", {"phone": normalized_phone, "status_code": response.status_code, "error_msg": error_msg, "attempt": attempt + 1}, "D")
                         # #endregion
+
+                        # Record failure metric (TECH-023)
+                        record_integration_request(
+                            integration="whatsapp",
+                            operation="send_message",
+                            success=False,
+                            duration_seconds=duration_ms / 1000,
+                        )
+
+                        # Record for alert monitoring (TECH-024)
+                        record_integration_result("whatsapp", success=False)
+
+                        # Check for auth failure and send immediate alert (TECH-024)
+                        if response.status_code in (401, 403):
+                            await check_and_alert_auth_failure(
+                                integration="whatsapp",
+                                status_code=response.status_code,
+                                error_message=error_msg,
+                            )
 
                         logger.error(
                             f"Z-API message send failed: {error_msg}",
@@ -280,6 +313,16 @@ class WhatsAppService:
         # #region debug instrumentation
         _debug_log("whatsapp.py:226", "ALL RETRIES EXHAUSTED", {"phone": normalized_phone, "max_retries": max_retries, "last_error": str(last_error) if last_error else None}, "D")
         # #endregion
+
+        # Record failure metric (TECH-023)
+        total_duration = time.perf_counter() - start_time
+        record_integration_request(
+            integration="whatsapp",
+            operation="send_message",
+            success=False,
+            duration_seconds=total_duration,
+        )
+
         logger.error(
             f"Z-API message send failed after {max_retries} attempts",
             extra={
