@@ -1207,6 +1207,197 @@ LOG_LEVEL=INFO</code></pre>
     },
 
     // ============================================
+    // MANUAL DO SDR (CHATWOOT)
+    // ============================================
+    'manual-sdr': {
+        title: 'Manual do Chatwoot para SDR',
+        clientNote: 'Este manual explica como usar o Chatwoot para acompanhar conversas, intervir quando necessário e devolver o atendimento para o agente automático. É essencial que todo SDR leia este guia antes de começar a usar o sistema.',
+        sections: [
+            {
+                title: '⚠️ Aviso Importante',
+                content: `
+                    <div class="callout callout-warning">
+                        <p><strong>O Chatwoot NÃO processa mensagens que começam com <code>/</code>.</strong></p>
+                        <p>Use comandos <strong>sem barra</strong>: digite <code>retomar</code> em vez de <code>/retomar</code>.</p>
+                    </div>
+                `
+            },
+            {
+                title: 'O que é o Chatwoot?',
+                content: `
+                    <p>O Chatwoot é a plataforma onde você acompanha todas as conversas do WhatsApp com os leads. Aqui você pode:</p>
+                    <ul>
+                        <li>👀 <strong>Visualizar</strong> todas as conversas em tempo real</li>
+                        <li>💬 <strong>Assumir</strong> uma conversa quando necessário</li>
+                        <li>🤖 <strong>Pausar</strong> o agente automático para atender pessoalmente</li>
+                        <li>▶️ <strong>Retomar</strong> o atendimento automático quando terminar</li>
+                    </ul>
+
+                    <h4>Acesso</h4>
+                    <ol>
+                        <li>Abra o navegador e acesse o link do Chatwoot (fornecido pelo administrador)</li>
+                        <li>Faça login com seu e-mail e senha</li>
+                        <li>Você verá o painel de conversas</li>
+                    </ol>
+                `
+            },
+            {
+                title: 'Entendendo a Tela Principal',
+                content: `
+                    <h4>Barra Lateral (Esquerda)</h4>
+                    <table>
+                        <thead>
+                            <tr><th>Ícone</th><th>Significado</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>💬 Conversas</td><td>Lista de todas as conversas</td></tr>
+                            <tr><td>📥 Caixa de Entrada</td><td>Conversas do WhatsApp</td></tr>
+                            <tr><td>👤 Contatos</td><td>Lista de leads</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h4>Lista de Conversas (Centro)</h4>
+                    <ul>
+                        <li><strong>Conversas em aberto:</strong> Leads que ainda estão em atendimento</li>
+                        <li><strong>Nome do lead:</strong> Aparece o nome ou número do WhatsApp</li>
+                        <li><strong>Prévia da mensagem:</strong> Última mensagem da conversa</li>
+                        <li><strong>Horário:</strong> Quando foi a última interação</li>
+                    </ul>
+
+                    <h4>Área de Conversa (Direita)</h4>
+                    <ul>
+                        <li>Histórico completo de mensagens</li>
+                        <li>Campo para digitar mensagens</li>
+                        <li>Informações do lead</li>
+                    </ul>
+                `
+            },
+            {
+                title: 'Como Funciona o Atendimento',
+                content: `
+                    <h4>Fluxo Normal (Automático)</h4>
+                    <div class="diagram">Lead envia mensagem no WhatsApp
+        ↓
+Agente automático responde
+        ↓
+Conversa aparece no Chatwoot para você acompanhar</div>
+
+                    <p><strong>Você não precisa fazer nada</strong> - apenas acompanha se quiser.</p>
+                `
+            },
+            {
+                title: 'Quando Intervir',
+                content: `
+                    <p>Você deve assumir a conversa quando:</p>
+                    <ul>
+                        <li>✅ Lead fez uma pergunta que o agente não soube responder</li>
+                        <li>✅ Lead pediu para falar com um humano</li>
+                        <li>✅ Lead está com problema específico</li>
+                        <li>✅ Lead está pronto para fechar negócio</li>
+                        <li>✅ Conversa está travada ou confusa</li>
+                    </ul>
+                `
+            },
+            {
+                title: 'Como Assumir uma Conversa',
+                content: `
+                    <h4>Passo 1: Abra a conversa</h4>
+                    <p>Clique na conversa que deseja assumir na lista.</p>
+
+                    <h4>Passo 2: Envie uma mensagem</h4>
+                    <p>Simplesmente <strong>digite e envie uma mensagem</strong> para o lead.</p>
+
+                    <div class="callout callout-info">
+                        <p>💡 <strong>Importante:</strong> Ao enviar qualquer mensagem, o agente automático é <strong>pausado automaticamente</strong> para esse lead. Você não precisa fazer mais nada!</p>
+                    </div>
+
+                    <h4>Passo 3: Continue o atendimento</h4>
+                    <p>A partir de agora, <strong>somente você</strong> está respondendo esse lead. O agente automático não vai interferir.</p>
+                `
+            },
+            {
+                title: 'Como Devolver para o Agente Automático',
+                content: `
+                    <p>Quando terminar seu atendimento e quiser que o agente automático volte a responder:</p>
+
+                    <h4>Digite o comando:</h4>
+                    <pre><code>retomar</code></pre>
+
+                    <div class="callout callout-warning">
+                        <p>⚠️ <strong>Use sem barra!</strong> O Chatwoot não envia mensagens que começam com <code>/</code>.</p>
+                    </div>
+
+                    <p>💡 O agente automático voltará a responder esse lead a partir da próxima mensagem dele.</p>
+
+                    <h4>Comandos alternativos:</h4>
+                    <ul>
+                        <li><code>continuar</code> - Também funciona</li>
+                        <li><code>!retomar</code> ou <code>!continuar</code> - Com exclamação também funciona</li>
+                    </ul>
+                `
+            },
+            {
+                title: 'Dicas Importantes',
+                content: `
+                    <h4>✅ Faça</h4>
+                    <ul>
+                        <li>Acompanhe as conversas regularmente</li>
+                        <li>Intervenha quando o lead precisar de atendimento humano</li>
+                        <li>Use <code>retomar</code> quando terminar seu atendimento</li>
+                        <li>Seja cordial e profissional nas mensagens</li>
+                    </ul>
+
+                    <h4>❌ Evite</h4>
+                    <ul>
+                        <li>Responder leads que estão sendo bem atendidos pelo agente</li>
+                        <li>Esquecer de usar <code>retomar</code> após terminar (o agente ficará pausado)</li>
+                        <li>Enviar mensagens de teste (elas vão para o WhatsApp do lead!)</li>
+                    </ul>
+                `
+            },
+            {
+                title: 'Perguntas Frequentes',
+                content: `
+                    <h4>"Enviei uma mensagem sem querer, o que faço?"</h4>
+                    <p>O agente foi pausado automaticamente. Se não era para intervir, digite <code>retomar</code> para reativar o agente.</p>
+
+                    <h4>"O lead está reclamando que ninguém responde"</h4>
+                    <p>Verifique se você ou outro SDR assumiu a conversa e não devolveu. Digite <code>retomar</code> se for o caso.</p>
+
+                    <h4>"Posso ver o que o agente respondeu?"</h4>
+                    <p>Sim! Todo o histórico fica visível na conversa, incluindo as respostas automáticas.</p>
+
+                    <h4>"Como sei se o agente está pausado ou ativo?"</h4>
+                    <p>Se você enviou alguma mensagem recentemente, o agente está pausado. Use <code>retomar</code> na dúvida.</p>
+
+                    <h4>"Posso responder fora do horário comercial?"</h4>
+                    <p>Sim, você pode responder a qualquer momento. O agente automático também funciona 24h.</p>
+                `
+            },
+            {
+                title: 'Resumo Rápido',
+                content: `
+                    <table>
+                        <thead>
+                            <tr><th>Ação</th><th>Como fazer</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Ver conversas</td><td>Clique em "Conversas"</td></tr>
+                            <tr><td>Assumir atendimento</td><td>Envie qualquer mensagem</td></tr>
+                            <tr><td>Devolver para agente</td><td>Digite <code>retomar</code></td></tr>
+                        </tbody>
+                    </table>
+
+                    <h4>Suporte</h4>
+                    <p>Problemas técnicos? Entre em contato com o administrador do sistema.</p>
+
+                    <p><em>Manual atualizado em Janeiro/2026</em></p>
+                `
+            }
+        ]
+    },
+
+    // ============================================
     // GLOSSÁRIO
     // ============================================
     'glossario': {

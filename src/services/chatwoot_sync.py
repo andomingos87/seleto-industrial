@@ -9,11 +9,14 @@ Features:
 - Create contacts and conversations automatically
 - Send internal notes (private messages) for SDR handoff
 - Retry with exponential backoff for resilience (TECH-029)
+- Feedback loop prevention (BUG-003)
 """
 
 import asyncio
+import hashlib
 import threading
 import time
+from threading import Lock
 from typing import Optional
 
 import httpx
@@ -46,6 +49,105 @@ CHATWOOT_RETRY_CONFIG = RetryConfig(
 
 # Cache for conversation IDs (phone -> chatwoot_conversation_id)
 _conversation_cache: dict[str, Optional[str]] = {}
+
+# ============================================================================
+# BUG-003 FIX: Feedback Loop Prevention
+# ============================================================================
+# Cache of recently sent bot messages to prevent webhook feedback loop.
+# When the bot sends a message to Chatwoot, the webhook fires back with
+# sender.type = "user" (the API user), which would incorrectly trigger
+# agent pause. This cache helps identify and ignore those webhook events.
+# ============================================================================
+
+# Structure: {message_hash: timestamp_of_send}
+_sent_messages_cache: dict[str, float] = {}
+_sent_messages_lock = Lock()
+_SENT_MESSAGES_TTL_SECONDS = 15  # Messages expire after 15 seconds
+
+
+def _get_message_hash(phone: str, content: str) -> str:
+    """
+    Generate a unique hash to identify a message.
+
+    Uses phone + content to create a short hash that can be used
+    to match webhook messages against recently sent bot messages.
+
+    Args:
+        phone: Normalized phone number
+        content: Message content
+
+    Returns:
+        16-character hexadecimal hash
+    """
+    normalized_content = content.strip()[:500]  # Limit content to prevent issues
+    return hashlib.sha256(f"{phone}:{normalized_content}".encode()).hexdigest()[:16]
+
+
+def _register_sent_message(phone: str, content: str) -> None:
+    """
+    Register a message as sent by the bot.
+
+    This is called after successfully sending a message to Chatwoot
+    to prevent the webhook from re-processing it as an SDR message.
+
+    Args:
+        phone: Normalized phone number
+        content: Message content
+    """
+    msg_hash = _get_message_hash(phone, content)
+    current_time = time.time()
+
+    with _sent_messages_lock:
+        _sent_messages_cache[msg_hash] = current_time
+
+        # Cleanup expired entries (keep cache small)
+        expired_hashes = [
+            h for h, t in _sent_messages_cache.items()
+            if current_time - t > _SENT_MESSAGES_TTL_SECONDS
+        ]
+        for h in expired_hashes:
+            del _sent_messages_cache[h]
+
+    logger.debug(
+        "Registered sent message in feedback prevention cache",
+        extra={"phone": phone, "hash": msg_hash, "cache_size": len(_sent_messages_cache)},
+    )
+
+
+def is_bot_message(phone: str, content: str) -> bool:
+    """
+    Check if a message was recently sent by the bot.
+
+    Used to prevent webhook feedback loops where the bot's own messages
+    sent to Chatwoot are incorrectly interpreted as SDR messages.
+
+    Args:
+        phone: Normalized phone number
+        content: Message content
+
+    Returns:
+        True if this message was recently sent by the bot, False otherwise
+    """
+    if not content:
+        return False
+
+    msg_hash = _get_message_hash(phone, content)
+    current_time = time.time()
+
+    with _sent_messages_lock:
+        if msg_hash in _sent_messages_cache:
+            timestamp = _sent_messages_cache[msg_hash]
+            if current_time - timestamp <= _SENT_MESSAGES_TTL_SECONDS:
+                logger.debug(
+                    "Message identified as bot's own (feedback loop prevention)",
+                    extra={"phone": phone, "hash": msg_hash, "age_seconds": current_time - timestamp},
+                )
+                return True
+            else:
+                # Expired, remove it
+                del _sent_messages_cache[msg_hash]
+
+    return False
 
 
 @with_retry_async(CHATWOOT_RETRY_CONFIG)
@@ -143,16 +245,26 @@ async def create_chatwoot_conversation(phone: str, sender_name: Optional[str] = 
 
             if list_response.status_code == 200:
                 response_data = list_response.json()
-                # Chatwoot API returns paginated response: {data: {...}, meta: {...}}
-                # Support both formats for defensive coding
+                # Chatwoot API returns various formats:
+                # - List: [{...}, {...}]
+                # - Paginated: {"data": [{...}], "meta": {...}}
+                # - Nested: {"data": {"payload": [...], "meta": {...}}}
+                conversations = []
                 if isinstance(response_data, list):
                     conversations = response_data
                 elif isinstance(response_data, dict):
-                    conversations = response_data.get("data", response_data.get("payload", []))
-                else:
-                    conversations = []
+                    data = response_data.get("data", {})
+                    if isinstance(data, list):
+                        conversations = data
+                    elif isinstance(data, dict):
+                        # Nested format: {"data": {"payload": [...]}}
+                        conversations = data.get("payload", [])
+                    else:
+                        # Fallback to payload at root level
+                        conversations = response_data.get("payload", [])
 
-                if conversations and len(conversations) > 0:
+                # Ensure conversations is a list before indexing
+                if isinstance(conversations, list) and len(conversations) > 0:
                     # Use existing conversation
                     conversation_id = str(conversations[0]["id"])
                     _conversation_cache[normalized_phone] = conversation_id
@@ -170,8 +282,8 @@ async def create_chatwoot_conversation(phone: str, sender_name: Optional[str] = 
                     "Content-Type": "application/json",
                 },
                 json={
-                    "source_id": contact_id,
-                    "inbox_id": None,  # Will use default inbox if not specified
+                    "contact_id": contact_id,
+                    "inbox_id": settings.CHATWOOT_INBOX_ID,
                 },
             )
 
@@ -233,16 +345,28 @@ async def _get_or_create_chatwoot_contact(phone: str, sender_name: Optional[str]
 
             if search_response.status_code == 200:
                 response_data = search_response.json()
-                # Chatwoot API returns paginated response: {payload: [...], meta: {...}}
-                # Support both formats for defensive coding
+                # Chatwoot API returns various formats:
+                # - List: [{...}, {...}]
+                # - Paginated: {"payload": [...], "meta": {...}}
+                # - Nested: {"data": {"payload": [...], "meta": {...}}}
+                contacts = []
                 if isinstance(response_data, list):
                     contacts = response_data
                 elif isinstance(response_data, dict):
-                    contacts = response_data.get("payload", [])
-                else:
-                    contacts = []
+                    # Try payload at root level first (most common for contacts)
+                    payload = response_data.get("payload")
+                    if isinstance(payload, list):
+                        contacts = payload
+                    else:
+                        # Try nested format: {"data": {"payload": [...]}}
+                        data = response_data.get("data", {})
+                        if isinstance(data, list):
+                            contacts = data
+                        elif isinstance(data, dict):
+                            contacts = data.get("payload", [])
 
-                if contacts and len(contacts) > 0:
+                # Ensure contacts is a list before indexing
+                if isinstance(contacts, list) and len(contacts) > 0:
                     # Use existing contact
                     contact_id = contacts[0].get("id")
                     logger.debug(
@@ -253,6 +377,8 @@ async def _get_or_create_chatwoot_contact(phone: str, sender_name: Optional[str]
 
             # Create new contact
             contact_name = sender_name or f"Lead {phone[-4:]}"  # Use last 4 digits if no name
+            # Format phone with + prefix for E.164 format expected by Chatwoot
+            phone_e164 = f"+{phone}" if not phone.startswith("+") else phone
             create_response = await client.post(
                 f"{settings.CHATWOOT_API_URL}/api/v1/accounts/{settings.CHATWOOT_ACCOUNT_ID}/contacts",
                 headers={
@@ -260,8 +386,9 @@ async def _get_or_create_chatwoot_contact(phone: str, sender_name: Optional[str]
                     "Content-Type": "application/json",
                 },
                 json={
+                    "inbox_id": settings.CHATWOOT_INBOX_ID,
                     "name": contact_name,
-                    "phone_number": phone,
+                    "phone_number": phone_e164,
                 },
             )
 
@@ -357,6 +484,11 @@ async def _sync_message_async(phone: str, role: str, content: str) -> None:
         # Map role to Chatwoot message type
         # In Chatwoot, messages from contact are "incoming", from agent are "outgoing"
         message_type = "incoming" if role == "user" else "outgoing"
+
+        # BUG-003 FIX: Register bot messages BEFORE sending to prevent feedback loop
+        # When Chatwoot webhook fires back, we'll recognize this message and ignore it
+        if role == "assistant":
+            _register_sent_message(phone, content)
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(

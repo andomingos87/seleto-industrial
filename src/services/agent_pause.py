@@ -27,7 +27,13 @@ logger = get_logger(__name__)
 _pause_cache: Dict[str, dict] = {}
 
 # Resume command patterns
-RESUME_COMMANDS = ["/retomar", "/continuar"]
+# Note: Chatwoot does NOT send webhooks for messages starting with "/"
+# So we accept both with and without "/" prefix
+RESUME_COMMANDS = [
+    "/retomar", "/continuar",  # With slash (for WhatsApp direct commands)
+    "retomar", "continuar",    # Without slash (for Chatwoot - can't start with /)
+    "!retomar", "!continuar",  # Alternative prefix for Chatwoot
+]
 
 
 def _get_pause_key(phone: str) -> str:

@@ -121,6 +121,102 @@ class TestCreateChatwootConversation:
             result = asyncio.run(create_chatwoot_conversation("5511999999999"))
             assert result is None
 
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    @patch("src.services.chatwoot_sync._get_or_create_chatwoot_contact")
+    def test_handles_nested_dict_response_format(
+        self, mock_get_contact, mock_client_class, reset_conversation_cache
+    ):
+        """Test that nested dict format {data: {payload: [], meta: {}}} is handled correctly.
+
+        This test covers the bug fix for KeyError: 0 when Chatwoot API returns
+        a nested dict instead of a list in the data field.
+        """
+        mock_get_contact.return_value = 123
+
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        # Mock list conversations with nested dict format (the problematic format)
+        # This is what Chatwoot self-hosted was returning and causing KeyError: 0
+        mock_client.get.return_value = Mock(
+            status_code=200,
+            json=lambda: {
+                "data": {
+                    "meta": {"mine_count": 0, "unassigned_count": 0, "all_count": 0},
+                    "payload": []  # Empty, should create new conversation
+                }
+            },
+        )
+
+        # Mock create conversation
+        mock_client.post.return_value = Mock(
+            status_code=201, json=lambda: {"id": 999}
+        )
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(create_chatwoot_conversation("5511999999999"))
+                    # Should NOT raise KeyError: 0, should create new conversation
+                    assert result == "999"
+                    mock_client.post.assert_called_once()
+
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    @patch("src.services.chatwoot_sync._get_or_create_chatwoot_contact")
+    def test_uses_existing_conversation_from_nested_payload(
+        self, mock_get_contact, mock_client_class, reset_conversation_cache
+    ):
+        """Test that existing conversation is found in nested payload format."""
+        mock_get_contact.return_value = 123
+
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        # Mock list conversations with nested dict format containing a conversation
+        mock_client.get.return_value = Mock(
+            status_code=200,
+            json=lambda: {
+                "data": {
+                    "meta": {"mine_count": 1, "all_count": 1},
+                    "payload": [{"id": 888, "status": "open"}]
+                }
+            },
+        )
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(create_chatwoot_conversation("5511999999999"))
+                    assert result == "888"
+                    # Should NOT call post since conversation exists
+                    mock_client.post.assert_not_called()
+
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    @patch("src.services.chatwoot_sync._get_or_create_chatwoot_contact")
+    def test_handles_dict_data_that_is_not_list_or_nested(
+        self, mock_get_contact, mock_client_class, reset_conversation_cache
+    ):
+        """Test fallback to payload at root level when data is neither list nor nested dict."""
+        mock_get_contact.return_value = 123
+
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        # Mock response with payload at root level (not in data)
+        mock_client.get.return_value = Mock(
+            status_code=200,
+            json=lambda: {
+                "data": "unexpected_string",  # Not a list or dict
+                "payload": [{"id": 777}]  # Fallback to this
+            },
+        )
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(create_chatwoot_conversation("5511999999999"))
+                    assert result == "777"
+
 
 class TestSyncMessageToChatwoot:
     """Tests for sync_message_to_chatwoot."""
@@ -282,6 +378,85 @@ class TestGetOrCreateChatwootContact:
                     result = asyncio.run(_get_or_create_chatwoot_contact("5511999999999"))
                     assert result == 111
                     mock_client.post.assert_called_once()
+
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    def test_handles_nested_dict_response_format(self, mock_client_class):
+        """Test that nested dict format {data: {payload: []}} is handled for contacts.
+
+        This test covers the same bug fix pattern as conversations, ensuring
+        contacts endpoint also handles nested response format.
+        """
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        # Mock search contacts with nested dict format
+        mock_client.get.return_value = Mock(
+            status_code=200,
+            json=lambda: {
+                "data": {
+                    "meta": {"count": 0},
+                    "payload": []  # Empty, should create new contact
+                }
+            },
+        )
+
+        # Mock create contact
+        mock_client.post.return_value = Mock(
+            status_code=201, json=lambda: {"id": 222}
+        )
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(_get_or_create_chatwoot_contact("5511999999999"))
+                    assert result == 222
+                    mock_client.post.assert_called_once()
+
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    def test_finds_contact_in_nested_payload(self, mock_client_class):
+        """Test that existing contact is found in nested payload format."""
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        # Mock search contacts with nested dict format containing a contact
+        mock_client.get.return_value = Mock(
+            status_code=200,
+            json=lambda: {
+                "data": {
+                    "meta": {"count": 1},
+                    "payload": [{"id": 333, "name": "Test", "phone_number": "+5511999999999"}]
+                }
+            },
+        )
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(_get_or_create_chatwoot_contact("5511999999999"))
+                    assert result == 333
+                    mock_client.post.assert_not_called()
+
+    @patch("src.services.chatwoot_sync.httpx.AsyncClient")
+    def test_finds_contact_in_data_as_list(self, mock_client_class):
+        """Test that contact is found when data is a list (alternative format)."""
+        mock_client = AsyncMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        # Mock search contacts with data as list
+        mock_client.get.return_value = Mock(
+            status_code=200,
+            json=lambda: {
+                "data": [{"id": 444, "name": "Test Contact"}],
+                "meta": {"count": 1}
+            },
+        )
+
+        with patch.object(settings, "CHATWOOT_API_URL", "https://test.chatwoot.com"):
+            with patch.object(settings, "CHATWOOT_API_TOKEN", "test-token"):
+                with patch.object(settings, "CHATWOOT_ACCOUNT_ID", 1):
+                    result = asyncio.run(_get_or_create_chatwoot_contact("5511999999999"))
+                    assert result == 444
+                    mock_client.post.assert_not_called()
 
 
 class TestSendInternalMessage:

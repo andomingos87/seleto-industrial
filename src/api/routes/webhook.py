@@ -9,7 +9,7 @@ Supports:
 import asyncio
 import json
 import time
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
@@ -20,7 +20,7 @@ from src.services.agent_pause import (
     pause_agent,
     process_sdr_command,
 )
-from src.services.chatwoot_sync import send_internal_message_to_chatwoot
+from src.services.chatwoot_sync import is_bot_message, send_internal_message_to_chatwoot
 from src.services.transcription import transcribe_audio
 from src.services.whatsapp import send_whatsapp_message, whatsapp_service
 from src.utils.logging import (
@@ -33,27 +33,6 @@ from src.utils.validation import normalize_phone, validate_phone
 
 router = APIRouter()
 logger = get_logger(__name__)
-
-# #region debug instrumentation
-def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = None):
-    """Write debug log in NDJSON format."""
-    try:
-        import os
-        log_path = r"c:\Users\Anderson Domingos\Documents\Projetos\seleto_industrial\.cursor\debug.log"
-        log_entry = {
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000)
-        }
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "\n")
-    except Exception:
-        pass  # Fail silently to not break production
-# #endregion
 
 
 class TextContent(BaseModel):
@@ -106,10 +85,6 @@ async def process_text_message(payload: WhatsAppWebhookPayload) -> dict:
     # Extract message text from Z-API nested structure
     message_text = payload.text.message if payload.text else ""
 
-    # #region debug instrumentation
-    _debug_log("webhook.py:63", "process_text_message ENTRY", {"phone": payload.phone, "has_message": bool(message_text)}, "A")
-    # #endregion
-
     normalized_phone = normalize_phone(payload.phone)
     if not validate_phone(normalized_phone):
         logger.warning(
@@ -132,38 +107,16 @@ async def process_text_message(payload: WhatsAppWebhookPayload) -> dict:
 
     # Process message with agent (US-001)
     try:
-        # #region debug instrumentation
-        _debug_log("webhook.py:95", "BEFORE process_message", {"phone": normalized_phone, "message_preview": message_text[:50] if message_text else ""}, "B")
-        # #endregion
-
         response_text = await process_message(
             phone=normalized_phone,
             message=message_text,
             sender_name=payload.senderName,
         )
 
-        # #region debug instrumentation
-        _debug_log("webhook.py:100", "AFTER process_message", {"phone": normalized_phone, "response_text": response_text[:100] if response_text else None, "response_length": len(response_text) if response_text else 0, "is_empty": not response_text}, "B")
-        # #endregion
-
         # Send response via Z-API
         if response_text:
-            # #region debug instrumentation
-            is_configured = whatsapp_service.is_configured()
-            _debug_log("webhook.py:103", "CHECK is_configured", {"phone": normalized_phone, "is_configured": is_configured, "instance_id": bool(whatsapp_service.instance_id), "instance_token": bool(whatsapp_service.instance_token), "client_token": bool(whatsapp_service.client_token)}, "A")
-            # #endregion
-            
-            if is_configured:
-                # #region debug instrumentation
-                _debug_log("webhook.py:104", "BEFORE send_whatsapp_message", {"phone": normalized_phone, "response_length": len(response_text)}, "D")
-                # #endregion
-                
+            if whatsapp_service.is_configured():
                 success = await send_whatsapp_message(normalized_phone, response_text)
-                
-                # #region debug instrumentation
-                _debug_log("webhook.py:105", "AFTER send_whatsapp_message", {"phone": normalized_phone, "success": success}, "D")
-                # #endregion
-                
                 if not success:
                     logger.error(
                         "Failed to send Z-API response",
@@ -178,20 +131,12 @@ async def process_text_message(payload: WhatsAppWebhookPayload) -> dict:
                     },
                 )
         else:
-            # #region debug instrumentation
-            _debug_log("webhook.py:118", "EMPTY response_text", {"phone": normalized_phone}, "B")
-            # #endregion
-            
             logger.warning(
                 "Empty response from agent, not sending",
                 extra={"phone": normalized_phone},
             )
 
     except Exception as e:
-        # #region debug instrumentation
-        _debug_log("webhook.py:124", "EXCEPTION in process_text_message", {"phone": normalized_phone, "error": str(e), "error_type": type(e).__name__}, "C")
-        # #endregion
-        
         logger.error(
             "Error processing message with agent",
             extra={
@@ -436,6 +381,25 @@ async def whatsapp_webhook(
             },
         )
 
+        # Detect and ignore Chatwoot webhooks sent to wrong endpoint
+        # Chatwoot payloads have 'event' field and no 'phone' field at root level
+        chatwoot_events = {
+            "message_created", "message_updated", "conversation_created",
+            "conversation_updated", "conversation_typing_on", "conversation_typing_off",
+            "conversation_status_changed", "conversation_resolved", "webwidget_triggered",
+        }
+        if payload_data.get("event") in chatwoot_events or (
+            "account" in payload_data and "phone" not in payload_data
+        ):
+            logger.debug(
+                "Ignoring Chatwoot webhook on WhatsApp endpoint",
+                extra={
+                    "event": payload_data.get("event"),
+                    "hint": "Configure Chatwoot to use /webhook/chatwoot endpoint instead",
+                },
+            )
+            return {"status": "ignored", "reason": "chatwoot_webhook_on_wrong_endpoint"}
+
         payload = WhatsAppWebhookPayload(**payload_data)
     except json.JSONDecodeError as e:
         logger.error(
@@ -493,22 +457,10 @@ async def whatsapp_webhook(
         )
     elif message_type == "audio" and payload.audio:
         # Process audio message
-        # #region debug instrumentation
-        _debug_log("webhook.py:385", "CREATING audio task", {"phone": normalized_phone}, "C")
-        # #endregion
-        task = asyncio.create_task(process_audio_message(payload))
-        # #region debug instrumentation
-        task.add_done_callback(lambda t: _debug_log("webhook.py:385", "audio task DONE", {"phone": normalized_phone, "exception": str(t.exception()) if t.exception() else None}, "C"))
-        # #endregion
+        asyncio.create_task(process_audio_message(payload))
     elif payload.text and payload.text.message:
         # Process text message (Z-API nested structure: text.message)
-        # #region debug instrumentation
-        _debug_log("webhook.py:388", "CREATING text task", {"phone": normalized_phone, "message_preview": payload.text.message[:50]}, "C")
-        # #endregion
-        task = asyncio.create_task(process_text_message(payload))
-        # #region debug instrumentation
-        task.add_done_callback(lambda t: _debug_log("webhook.py:388", "text task DONE", {"phone": normalized_phone, "exception": str(t.exception()) if t.exception() else None}, "C"))
-        # #endregion
+        asyncio.create_task(process_text_message(payload))
     else:
         logger.warning(
             "Webhook received but no message or audio found",
@@ -583,21 +535,67 @@ class ChatwootWebhookPayload(BaseModel):
     """
     Chatwoot webhook payload for message events.
 
-    Chatwoot sends webhooks with the following structure:
+    Chatwoot sends webhooks with message fields at ROOT level (not nested):
     {
         "event": "message_created",
-        "message": {...},
+        "content": "message text",
+        "sender": {"id": 1, "name": "Agent", "type": "user"},
+        "message_type": "outgoing",
         "conversation": {...},
-        "contact": {...},
         "account": {...}
     }
     """
 
+    # Webhook event type
     event: Optional[str] = Field(None, description="Webhook event type")
-    message: Optional[ChatwootMessage] = Field(None, description="Message object")
+
+    # Message fields (at ROOT level, not nested in "message")
+    id: Optional[int] = Field(None, description="Message ID")
+    content: Optional[str] = Field(None, description="Message content")
+    message_type: Optional[str] = Field(None, description="Message type: incoming/outgoing")
+    content_type: Optional[str] = Field(None, description="Content type: text/input_select/etc")
+    private: Optional[bool] = Field(False, description="Whether message is private/internal")
+    sender: Optional[ChatwootSender] = Field(None, description="Message sender")
+    source_id: Optional[str] = Field(None, description="Source ID")
+    # Timestamps can be string (ISO), int (Unix), or float (Unix with decimals)
+    created_at: Optional[Union[str, int, float]] = Field(None, description="Creation timestamp")
+    updated_at: Optional[Union[str, int, float]] = Field(None, description="Update timestamp")
+    timestamp: Optional[Union[str, int, float]] = Field(None, description="Timestamp")
+    inbox: Optional[dict] = Field(None, description="Inbox details")
+    inbox_id: Optional[int] = Field(None, description="Inbox ID")
+    content_attributes: Optional[dict] = Field(None, description="Content attributes")
+    additional_attributes: Optional[dict] = Field(None, description="Additional attributes")
+
+    # conversation_updated event fields
+    can_reply: Optional[bool] = Field(None, description="Can reply to conversation")
+    channel: Optional[str] = Field(None, description="Channel type")
+    contact_inbox: Optional[dict] = Field(None, description="Contact inbox details")
+    messages: Optional[list] = Field(None, description="Messages in conversation")
+    labels: Optional[list] = Field(None, description="Labels")
+    meta: Optional[dict] = Field(None, description="Metadata")
+    status: Optional[str] = Field(None, description="Conversation status")
+    custom_attributes: Optional[dict] = Field(None, description="Custom attributes")
+    snoozed_until: Optional[Union[str, int, float]] = Field(None, description="Snoozed until")
+    unread_count: Optional[int] = Field(None, description="Unread count")
+    first_reply_created_at: Optional[Union[str, int, float]] = Field(None, description="First reply timestamp")
+    priority: Optional[str] = Field(None, description="Priority")
+    waiting_since: Optional[Union[str, int, float]] = Field(None, description="Waiting since")
+    agent_last_seen_at: Optional[Union[str, int, float]] = Field(None, description="Agent last seen")
+    contact_last_seen_at: Optional[Union[str, int, float]] = Field(None, description="Contact last seen")
+    last_activity_at: Optional[Union[str, int, float]] = Field(None, description="Last activity")
+    changed_attributes: Optional[Union[dict, list]] = Field(None, description="Changed attributes")
+
+    # typing event fields
+    user: Optional[dict] = Field(None, description="User object for typing events")
+    is_private: Optional[bool] = Field(None, description="Is private typing")
+
+    # Related objects
     conversation: Optional[ChatwootConversation] = Field(None, description="Conversation object")
     contact: Optional[ChatwootContact] = Field(None, description="Contact object")
     account: Optional[dict] = Field(None, description="Account object")
+
+    # Legacy field for backwards compatibility (some versions may still use it)
+    message: Optional[ChatwootMessage] = Field(None, description="Legacy message object")
 
 
 def _is_sdr_message(payload: ChatwootWebhookPayload) -> bool:
@@ -613,11 +611,17 @@ def _is_sdr_message(payload: ChatwootWebhookPayload) -> bool:
     Returns:
         True if message is from SDR, False otherwise
     """
-    if not payload.message or not payload.message.sender:
-        return False
+    # Check sender at root level (current Chatwoot structure)
+    if payload.sender:
+        sender_type = payload.sender.type
+        return sender_type == "user"
 
-    sender_type = payload.message.sender.type
-    return sender_type == "user"
+    # Fallback: check legacy nested message structure
+    if payload.message and payload.message.sender:
+        sender_type = payload.message.sender.type
+        return sender_type == "user"
+
+    return False
 
 
 def _extract_phone_from_payload(payload: ChatwootWebhookPayload) -> Optional[str]:
@@ -665,11 +669,21 @@ async def process_chatwoot_message(payload: ChatwootWebhookPayload) -> dict:
     Returns:
         Processing result dictionary
     """
-    if not payload.message:
-        return {"status": "ignored", "reason": "no_message"}
+    # Get message content from root level (current Chatwoot structure)
+    # or fall back to legacy nested message structure
+    message_content = payload.content or ""
+    if not message_content and payload.message:
+        message_content = payload.message.content or ""
 
-    message_content = payload.message.content or ""
-    is_private = payload.message.private or False
+    # Check if there's any message content
+    if not message_content:
+        return {"status": "ignored", "reason": "no_message_content"}
+
+    # Get private flag from root level or legacy structure
+    is_private = payload.private or False
+    if payload.message:
+        is_private = is_private or (payload.message.private or False)
+
     is_from_sdr = _is_sdr_message(payload)
 
     # Extract phone number for the conversation
@@ -680,7 +694,7 @@ async def process_chatwoot_message(payload: ChatwootWebhookPayload) -> dict:
             "Chatwoot webhook: could not extract phone number",
             extra={
                 "conversation_id": payload.conversation.id if payload.conversation else None,
-                "message_id": payload.message.id,
+                "message_id": payload.id,
             },
         )
         return {"status": "error", "reason": "no_phone"}
@@ -688,18 +702,46 @@ async def process_chatwoot_message(payload: ChatwootWebhookPayload) -> dict:
     # Set phone in context for logging
     set_phone(phone)
 
-    sender_name = payload.message.sender.name if payload.message.sender else None
-    sender_id = str(payload.message.sender.id) if payload.message.sender and payload.message.sender.id else None
+    # BUG-003 FIX: Check if this is a message we sent ourselves (feedback loop prevention)
+    # When our bot sends a message to Chatwoot via API, Chatwoot fires a webhook back
+    # with sender.type = "user" (the API user), which would incorrectly trigger agent pause
+    if is_bot_message(phone, message_content):
+        logger.debug(
+            "Ignoring bot's own message (feedback loop prevention)",
+            extra={
+                "phone": phone,
+                "message_preview": message_content[:50] if message_content else None,
+            },
+        )
+        return {"status": "ignored", "reason": "bot_message_feedback_loop"}
+
+    # Get sender name and ID from root level or legacy structure
+    sender_name = None
+    sender_id = None
+    sender_type = None
+    if payload.sender:
+        sender_name = payload.sender.name
+        sender_id = str(payload.sender.id) if payload.sender.id else None
+        sender_type = payload.sender.type
+    elif payload.message and payload.message.sender:
+        sender_name = payload.message.sender.name
+        sender_id = str(payload.message.sender.id) if payload.message.sender.id else None
+        sender_type = payload.message.sender.type
+
+    # Get message ID from root level or legacy structure
+    message_id = payload.id
+    if not message_id and payload.message:
+        message_id = payload.message.id
 
     logger.info(
         "Chatwoot message received",
         extra={
             "phone": phone,
-            "message_id": payload.message.id,
+            "message_id": message_id,
             "is_from_sdr": is_from_sdr,
             "is_private": is_private,
             "sender_name": sender_name,
-            "sender_type": payload.message.sender.type if payload.message.sender else None,
+            "sender_type": sender_type,
             "message_preview": message_content[:50] if message_content else None,
         },
     )
@@ -759,10 +801,37 @@ async def process_chatwoot_message(payload: ChatwootWebhookPayload) -> dict:
             send_internal_message_to_chatwoot(phone, confirmation, sender_name="Sistema")
         )
 
+    # BUG-002 FIX: Send SDR's message to WhatsApp via Z-API
+    # This ensures the lead receives the SDR's message on WhatsApp
+    if message_content and message_content.strip():
+        try:
+            whatsapp_success = await send_whatsapp_message(phone, message_content)
+            if whatsapp_success:
+                logger.info(
+                    "SDR message sent to WhatsApp",
+                    extra={
+                        "phone": phone,
+                        "sender_name": sender_name,
+                        "message_length": len(message_content),
+                    },
+                )
+            else:
+                logger.error(
+                    "Failed to send SDR message to WhatsApp",
+                    extra={"phone": phone, "message_content_preview": message_content[:50]},
+                )
+        except Exception as e:
+            logger.error(
+                "Error sending SDR message to WhatsApp",
+                extra={"phone": phone, "error": str(e)},
+                exc_info=True,
+            )
+
     return {
         "status": "agent_paused" if success else "pause_failed",
         "phone": phone,
         "sender_name": sender_name,
+        "message_sent_to_whatsapp": bool(message_content and message_content.strip()),
     }
 
 
@@ -797,17 +866,6 @@ async def chatwoot_webhook(
     # Parse payload
     try:
         payload_data = json.loads(body_bytes)
-
-        logger.debug(
-            "Chatwoot webhook raw payload",
-            extra={
-                "event": payload_data.get("event"),
-                "has_message": "message" in payload_data,
-                "has_conversation": "conversation" in payload_data,
-                "has_contact": "contact" in payload_data,
-            },
-        )
-
         payload = ChatwootWebhookPayload(**payload_data)
 
     except json.JSONDecodeError as e:
@@ -851,8 +909,8 @@ async def chatwoot_webhook(
     # Filter events - only process message_created
     event_type = payload.event
     if event_type != "message_created":
-        logger.debug(
-            "Chatwoot webhook event ignored",
+        logger.info(
+            "Chatwoot webhook event ignored (not message_created)",
             extra={"event": event_type, "phone": phone},
         )
         return Response(
@@ -860,6 +918,30 @@ async def chatwoot_webhook(
             content='{"status": "ignored", "reason": "event_type"}',
             media_type="application/json",
         )
+
+    # Log that we're processing this message (check root level first, then legacy)
+    content_preview = None
+    if payload.content:
+        content_preview = payload.content[:50]
+    elif payload.message and payload.message.content:
+        content_preview = payload.message.content[:50]
+
+    sender_type = None
+    if payload.sender:
+        sender_type = payload.sender.type
+    elif payload.message and payload.message.sender:
+        sender_type = payload.message.sender.type
+
+    logger.info(
+        "Chatwoot message_created event - processing",
+        extra={
+            "phone": phone,
+            "has_content": bool(payload.content or (payload.message and payload.message.content)),
+            "message_content_preview": content_preview,
+            "sender_type": sender_type,
+            "is_sdr": sender_type == "user",
+        },
+    )
 
     # Process message asynchronously
     asyncio.create_task(process_chatwoot_message(payload))
