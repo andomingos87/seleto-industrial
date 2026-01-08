@@ -457,6 +457,8 @@ class KnowledgeBase:
         """
         Register a technical question for human follow-up.
 
+        Persists to database if available, falls back to in-memory storage.
+
         Args:
             phone: Customer's phone number
             question: The technical question asked
@@ -464,6 +466,32 @@ class KnowledgeBase:
         """
         from datetime import datetime
 
+        from src.services.conversation_persistence import get_supabase_client
+
+        # Try to persist to database
+        client = get_supabase_client()
+        if client:
+            try:
+                client.table("technical_questions").insert({
+                    "phone": phone,
+                    "question": question,
+                    "context": context,
+                }).execute()
+                logger.info(
+                    "Technical question registered in database",
+                    extra={
+                        "phone": phone,
+                        "question_preview": question[:100] if len(question) > 100 else question,
+                    },
+                )
+                return
+            except Exception as e:
+                logger.warning(
+                    "Failed to persist technical question to database, using in-memory fallback",
+                    extra={"error": str(e)},
+                )
+
+        # Fallback to in-memory storage
         technical_question = TechnicalQuestion(
             phone=phone,
             question=question,
@@ -474,7 +502,7 @@ class KnowledgeBase:
         _technical_questions.append(technical_question)
 
         logger.info(
-            "Technical question registered for follow-up",
+            "Technical question registered in memory",
             extra={
                 "phone": phone,
                 "question_preview": question[:100] if len(question) > 100 else question,

@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { api, BusinessHoursResponse, BusinessHoursUpdateRequest } from "@/lib/api"
 
 /**
@@ -23,6 +24,12 @@ export function useUpdateBusinessHours() {
     mutationFn: (data) => api.put<BusinessHoursResponse>("/api/admin/config/business-hours", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["business-hours"] })
+      toast.success("Horário comercial atualizado com sucesso")
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar horário comercial", {
+        description: error.message || "Tente novamente mais tarde"
+      })
     },
   })
 }

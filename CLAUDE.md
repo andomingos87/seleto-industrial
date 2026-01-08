@@ -82,7 +82,7 @@ Located at `prompts/sp_agente_v1.xml`. Loaded securely with path validation and 
 
 **Always use Supabase MCP tools for database operations.**
 
-Tables: `conversations`, `conversation_context`, `leads`, `orcamentos`, `empresas`, `technical_questions`
+Tables: `conversations`, `conversation_context`, `leads`, `orcamentos`, `empresas`, `technical_questions`, `products`, `audit_logs`
 
 ### Data Normalization
 - **Phone**: E.164 format, digits only (e.g., `5511999999999`)
@@ -111,6 +111,25 @@ For full integration (MVP):
 | `POST /webhook/chatwoot` | Chatwoot webhook (SDR intervention) |
 | `GET /metrics` | Prometheus metrics (TECH-023) |
 | `GET /docs` | Swagger UI |
+
+### Admin Panel API (Phase 3)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/admin/knowledge/products` | List products with filters |
+| `POST /api/admin/knowledge/products` | Create product |
+| `GET /api/admin/knowledge/products/{id}` | Get product details |
+| `PUT /api/admin/knowledge/products/{id}` | Update product |
+| `DELETE /api/admin/knowledge/products/{id}` | Delete product |
+| `GET /api/admin/knowledge/questions` | List technical questions |
+| `PUT /api/admin/knowledge/questions/{id}` | Mark question as answered |
+| `GET /api/admin/logs/audit` | List audit logs with filters |
+| `GET /api/admin/logs/audit/{id}` | Get audit log details |
+| `GET /api/admin/config/prompts` | List available prompts |
+| `GET /api/admin/config/prompts/{name}` | Get prompt content |
+| `PUT /api/admin/config/prompts/{name}` | Save prompt (with backup) |
+| `GET /api/admin/config/prompts/{name}/backups` | List prompt backups |
+| `POST /api/admin/config/prompts/{name}/restore` | Restore prompt from backup |
 
 ## Key Implementation Notes
 
@@ -169,9 +188,27 @@ For full integration (MVP):
   - `get_audit_logs()` - Query audit logs with filters
   - `cleanup_old_audit_logs()` - Retention cleanup
 
+## Admin Panel (Phase 3)
+
+### Frontend (admin-panel/)
+- **Stack**: Next.js 14 + Tailwind CSS + shadcn/ui
+- **Auth**: Supabase Auth
+- **Pages**:
+  - `/knowledge` - Products CRUD with filters
+  - `/knowledge/questions` - Technical questions queue
+  - `/logs` - Audit logs viewer with diff
+  - `/config/prompts` - System prompt editor
+
+### Key Features
+- **Products CRUD**: Full management of equipment catalog
+- **Technical Questions**: Queue for specialist follow-up
+- **Audit Logs**: Filterable viewer with before/after diff
+- **Prompt Editor**: Edit system prompts with backup/restore
+
 ## Documentation
 
 - `.context/docs/` - Architecture, workflows, security docs
+- `.context/plans/` - Implementation plans (admin-panel phases)
 - `documentation/` - Project planning and requirements
 - `documentation/runbooks/` - Operational runbooks
 - `prompts/` - Agent prompts and product info

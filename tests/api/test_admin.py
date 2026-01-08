@@ -397,3 +397,438 @@ class TestCacheEndpoint:
         assert data["success"] is True
         assert "5511999999999" in data["message"]
         mock_clear.assert_called_once_with("5511999999999")
+
+
+# =============================================================================
+# Phase 3: Knowledge Base - Products Endpoints
+# =============================================================================
+
+
+class TestProductsEndpoints:
+    """Tests for products CRUD endpoints."""
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_list_products_success(self, mock_client, client):
+        """Test GET /api/admin/knowledge/products success."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        mock_query = MagicMock()
+        mock_supabase.table.return_value.select.return_value = mock_query
+        mock_query.order.return_value = mock_query
+        mock_query.range.return_value = mock_query
+        mock_query.execute.return_value = MagicMock(
+            data=[
+                {
+                    "id": "123",
+                    "name": "Formadora FB700",
+                    "category": "formadora",
+                    "description": "Test description",
+                    "specifications": ["Spec 1", "Spec 2"],
+                    "productivity": "700/hora",
+                    "is_available": True,
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "updated_at": "2024-01-01T00:00:00Z",
+                }
+            ],
+            count=1
+        )
+        
+        response = client.get("/api/admin/knowledge/products")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "items" in data
+        assert "total" in data
+        assert len(data["items"]) == 1
+        assert data["items"][0]["name"] == "Formadora FB700"
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_list_products_with_category_filter(self, mock_client, client):
+        """Test products filtering by category."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        mock_query = MagicMock()
+        mock_supabase.table.return_value.select.return_value = mock_query
+        mock_query.eq.return_value = mock_query
+        mock_query.order.return_value = mock_query
+        mock_query.range.return_value = mock_query
+        mock_query.execute.return_value = MagicMock(data=[], count=0)
+        
+        response = client.get("/api/admin/knowledge/products?category=formadora")
+        
+        assert response.status_code == 200
+        mock_query.eq.assert_called_with("category", "formadora")
+
+    def test_list_products_invalid_category(self, client):
+        """Test products with invalid category returns error."""
+        response = client.get("/api/admin/knowledge/products?category=invalid")
+        
+        assert response.status_code == 400
+        assert "Invalid category" in response.json()["detail"]
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    @patch("src.api.routes.admin.log_entity_create")
+    def test_create_product_success(self, mock_log, mock_client, client):
+        """Test POST /api/admin/knowledge/products success."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        mock_log.return_value = True
+        
+        mock_supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(
+            data=[{
+                "id": "new-123",
+                "name": "New Product",
+                "category": "formadora",
+                "description": "Test",
+                "specifications": [],
+                "productivity": None,
+                "is_available": True,
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z",
+            }]
+        )
+        
+        response = client.post(
+            "/api/admin/knowledge/products",
+            json={
+                "name": "New Product",
+                "category": "formadora",
+                "description": "Test",
+            }
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "New Product"
+
+    def test_create_product_invalid_category(self, client):
+        """Test create product with invalid category."""
+        response = client.post(
+            "/api/admin/knowledge/products",
+            json={
+                "name": "Test",
+                "category": "invalid",
+                "description": "Test",
+            }
+        )
+        
+        assert response.status_code == 400
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_get_product_success(self, mock_client, client):
+        """Test GET /api/admin/knowledge/products/{id} success."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[{
+                "id": "123",
+                "name": "Test Product",
+                "category": "formadora",
+                "description": "Test",
+                "specifications": [],
+                "productivity": None,
+                "is_available": True,
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z",
+            }]
+        )
+        
+        response = client.get("/api/admin/knowledge/products/123")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "123"
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_get_product_not_found(self, mock_client, client):
+        """Test GET /api/admin/knowledge/products/{id} not found."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[]
+        )
+        
+        response = client.get("/api/admin/knowledge/products/nonexistent")
+        
+        assert response.status_code == 404
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    @patch("src.api.routes.admin.log_entity_delete")
+    def test_delete_product_success(self, mock_log, mock_client, client):
+        """Test DELETE /api/admin/knowledge/products/{id} success."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        mock_log.return_value = True
+        
+        # Mock get current product
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[{"id": "123", "name": "Test", "category": "formadora"}]
+        )
+        
+        # Mock delete
+        mock_supabase.table.return_value.delete.return_value.eq.return_value.execute.return_value = MagicMock()
+        
+        response = client.delete("/api/admin/knowledge/products/123")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+
+
+# =============================================================================
+# Phase 3: Knowledge Base - Technical Questions Endpoints
+# =============================================================================
+
+
+class TestTechnicalQuestionsEndpoints:
+    """Tests for technical questions endpoints."""
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_list_questions_success(self, mock_client, client):
+        """Test GET /api/admin/knowledge/questions success."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        mock_query = MagicMock()
+        mock_supabase.table.return_value.select.return_value = mock_query
+        mock_query.order.return_value = mock_query
+        mock_query.range.return_value = mock_query
+        mock_query.execute.return_value = MagicMock(
+            data=[
+                {
+                    "id": "q1",
+                    "phone": "5511999999999",
+                    "question": "Test question?",
+                    "context": None,
+                    "timestamp": "2024-01-01T00:00:00Z",
+                    "answered": False,
+                    "answered_at": None,
+                    "answer": None,
+                }
+            ],
+            count=1
+        )
+        
+        response = client.get("/api/admin/knowledge/questions")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "items" in data
+        assert len(data["items"]) == 1
+        assert data["items"][0]["question"] == "Test question?"
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_list_questions_filter_pending(self, mock_client, client):
+        """Test filtering questions by answered status."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        mock_query = MagicMock()
+        mock_supabase.table.return_value.select.return_value = mock_query
+        mock_query.eq.return_value = mock_query
+        mock_query.order.return_value = mock_query
+        mock_query.range.return_value = mock_query
+        mock_query.execute.return_value = MagicMock(data=[], count=0)
+        
+        response = client.get("/api/admin/knowledge/questions?answered=false")
+        
+        assert response.status_code == 200
+        mock_query.eq.assert_called_with("answered", False)
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_mark_question_answered(self, mock_client, client):
+        """Test PUT /api/admin/knowledge/questions/{id} to mark as answered."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        # Mock check exists
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[{"id": "q1", "answered": False}]
+        )
+        
+        # Mock update
+        mock_supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[{
+                "id": "q1",
+                "phone": "5511999999999",
+                "question": "Test?",
+                "context": None,
+                "timestamp": "2024-01-01T00:00:00Z",
+                "answered": True,
+                "answered_at": "2024-01-02T00:00:00Z",
+                "answer": "Test answer",
+            }]
+        )
+        
+        response = client.put(
+            "/api/admin/knowledge/questions/q1",
+            json={"answer": "Test answer"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["answered"] is True
+
+
+# =============================================================================
+# Phase 3: Audit Logs Endpoints
+# =============================================================================
+
+
+class TestAuditLogsEndpoints:
+    """Tests for audit logs endpoints."""
+
+    @patch("src.api.routes.admin.get_audit_logs")
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_list_audit_logs_success(self, mock_client, mock_get_logs, client):
+        """Test GET /api/admin/logs/audit success."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        mock_get_logs.return_value = [
+            {
+                "id": "log1",
+                "timestamp": "2024-01-01T00:00:00Z",
+                "action": "CREATE",
+                "entity_type": "lead",
+                "entity_id": "123",
+                "user_id": "system",
+                "changes": None,
+                "metadata": None,
+                "ip_address": None,
+            }
+        ]
+        
+        # Mock count query
+        mock_supabase.table.return_value.select.return_value.execute.return_value = MagicMock(count=1)
+        
+        response = client.get("/api/admin/logs/audit")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "items" in data
+        assert "total" in data
+
+    @patch("src.api.routes.admin.get_audit_logs")
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_list_audit_logs_with_filters(self, mock_client, mock_get_logs, client):
+        """Test audit logs with action filter."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        mock_get_logs.return_value = []
+        
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
+        
+        response = client.get("/api/admin/logs/audit?action=CREATE")
+        
+        assert response.status_code == 200
+
+    def test_list_audit_logs_invalid_action(self, client):
+        """Test audit logs with invalid action filter."""
+        response = client.get("/api/admin/logs/audit?action=INVALID")
+        
+        assert response.status_code == 400
+        assert "Invalid action" in response.json()["detail"]
+
+    @patch("src.api.routes.admin.get_supabase_client")
+    def test_get_audit_log_success(self, mock_client, client):
+        """Test GET /api/admin/logs/audit/{id} success."""
+        mock_supabase = MagicMock()
+        mock_client.return_value = mock_supabase
+        
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[{
+                "id": "log1",
+                "timestamp": "2024-01-01T00:00:00Z",
+                "action": "CREATE",
+                "entity_type": "lead",
+                "entity_id": "123",
+                "user_id": "system",
+                "changes": {"after": {"name": "Test"}},
+                "metadata": None,
+                "ip_address": None,
+            }]
+        )
+        
+        response = client.get("/api/admin/logs/audit/log1")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "log1"
+
+
+# =============================================================================
+# Phase 3: Prompts Endpoints
+# =============================================================================
+
+
+class TestPromptsEndpoints:
+    """Tests for prompts management endpoints."""
+
+    def test_list_prompts_success(self, client):
+        """Test GET /api/admin/config/prompts success."""
+        response = client.get("/api/admin/config/prompts")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "prompts" in data
+        assert isinstance(data["prompts"], list)
+
+    def test_get_prompt_success(self, client):
+        """Test GET /api/admin/config/prompts/{name} success."""
+        # First get list of prompts
+        list_response = client.get("/api/admin/config/prompts")
+        prompts = list_response.json()["prompts"]
+        
+        if prompts:
+            response = client.get(f"/api/admin/config/prompts/{prompts[0]}")
+            
+            assert response.status_code == 200
+            data = response.json()
+            
+            assert "name" in data
+            assert "content" in data
+            assert "path" in data
+
+    def test_get_prompt_not_found(self, client):
+        """Test GET /api/admin/config/prompts/{name} not found."""
+        response = client.get("/api/admin/config/prompts/nonexistent_prompt")
+        
+        assert response.status_code == 404
+
+    def test_save_prompt_invalid_xml(self, client):
+        """Test PUT /api/admin/config/prompts/{name} with invalid XML."""
+        # First get a valid prompt name
+        list_response = client.get("/api/admin/config/prompts")
+        prompts = list_response.json()["prompts"]
+        
+        if prompts:
+            response = client.put(
+                f"/api/admin/config/prompts/{prompts[0]}",
+                json={"content": "not valid xml <unclosed"}
+            )
+            
+            assert response.status_code == 400
+            assert "Invalid XML" in response.json()["detail"]
+
+    def test_list_prompt_backups(self, client):
+        """Test GET /api/admin/config/prompts/{name}/backups."""
+        list_response = client.get("/api/admin/config/prompts")
+        prompts = list_response.json()["prompts"]
+        
+        if prompts:
+            response = client.get(f"/api/admin/config/prompts/{prompts[0]}/backups")
+            
+            assert response.status_code == 200
+            data = response.json()
+            
+            assert "backups" in data
+            assert isinstance(data["backups"], list)

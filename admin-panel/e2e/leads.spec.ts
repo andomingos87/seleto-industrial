@@ -217,8 +217,9 @@ test.describe('Lead Detail', () => {
   });
 
   test('should have pause/resume agent button', async ({ page }) => {
-    // Check for pause button (lead is not paused in mock)
-    await expect(page.locator('button:has-text("Pausar Agente")')).toBeVisible();
+    // Check for pause/resume button (lead 5511999999999 is paused in mock, so shows "Retomar Agente")
+    const pauseResumeButton = page.locator('button:has-text("Pausar Agente"), button:has-text("Retomar Agente")');
+    await expect(pauseResumeButton).toBeVisible();
   });
 
   test('should show resume button when lead is paused', async ({ page }) => {

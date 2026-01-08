@@ -1,6 +1,6 @@
-# SDR Agent Admin Panel
+# Seleto Industrial - Admin Panel
 
-Painel administrativo para controle operacional do agente SDR da Seleto Industrial.
+Painel administrativo para gerenciamento do SDR Agent.
 
 ## Stack
 
@@ -9,137 +9,63 @@ Painel administrativo para controle operacional do agente SDR da Seleto Industri
 - **Auth:** Supabase Auth
 - **State:** TanStack Query (React Query)
 - **Forms:** React Hook Form + Zod
+- **Testing:** Playwright (E2E)
 - **Deploy:** Fly.io
 
-## Setup Local
+## Features
 
-### 1. Instalar dependencias
+- 📊 **Dashboard de Status** - Visão geral do sistema e integrações
+- 🤖 **Controle do Agente** - Pausar/retomar, recarregar prompt
+- ⏰ **Horário Comercial** - Configurar dias e horários de operação
+- 👥 **Gestão de Leads** - Lista e detalhes de conversas
+- 📦 **Base de Conhecimento** - CRUD de produtos
+- ❓ **Perguntas Técnicas** - Fila para especialistas
+- 📝 **Audit Logs** - Histórico de operações com diff viewer
+- ⚙️ **Editor de Prompts** - Edição do system prompt com backup
+
+## Desenvolvimento
+
+### Requisitos
+
+- Node.js 20+
+- npm ou pnpm
+
+### Setup
 
 ```bash
 cd admin-panel
 npm install
-```
-
-### 2. Configurar variaveis de ambiente
-
-```bash
 cp .env.example .env.local
-```
-
-Edite `.env.local` com suas credenciais:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_anon_key
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-### 3. Rodar servidor de desenvolvimento
-
-```bash
+# Editar .env.local com suas credenciais
 npm run dev
 ```
 
 Acesse [http://localhost:3000](http://localhost:3000).
 
-## Deploy no Fly.io
+### Variáveis de Ambiente
 
-### 1. Instalar Fly CLI
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+## Testes
+
+### E2E (Playwright)
 
 ```bash
-# macOS
-brew install flyctl
-
-# Windows
-powershell -Command "iwr https://fly.io/install.ps1 -useb | iex"
-
-# Linux
-curl -L https://fly.io/install.sh | sh
+npm run test:e2e        # Headless
+npm run test:e2e:ui     # Com UI interativa
+npm run test:e2e:headed # Com browser visível
+npm run test:e2e:debug  # Modo debug
+npm run test:e2e:report # Ver relatório
 ```
 
-### 2. Login no Fly.io
+### Cobertura
 
-```bash
-fly auth login
-```
-
-### 3. Criar app (primeira vez)
-
-```bash
-fly apps create seleto-admin-panel
-```
-
-### 4. Configurar secrets
-
-```bash
-fly secrets set NEXT_PUBLIC_SUPABASE_URL="https://seu-projeto.supabase.co"
-fly secrets set NEXT_PUBLIC_SUPABASE_ANON_KEY="sua_anon_key"
-fly secrets set NEXT_PUBLIC_API_URL="https://seu-backend.fly.dev"
-```
-
-### 5. Deploy
-
-```bash
-fly deploy --build-arg NEXT_PUBLIC_SUPABASE_URL="https://seu-projeto.supabase.co" \
-           --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="sua_anon_key" \
-           --build-arg NEXT_PUBLIC_API_URL="https://seu-backend.fly.dev"
-```
-
-> **Nota:** As variaveis `NEXT_PUBLIC_*` precisam ser passadas como build args pois sao injetadas no build time pelo Next.js.
-
-### 6. Verificar status
-
-```bash
-fly status
-fly logs
-```
-
-## Estrutura de Pastas
-
-```
-admin-panel/
-├── src/
-│   ├── app/
-│   │   ├── (auth)/           # Paginas de autenticacao
-│   │   │   └── login/
-│   │   ├── (dashboard)/      # Paginas protegidas
-│   │   │   ├── agent/        # Controle do agente
-│   │   │   ├── config/       # Configuracoes
-│   │   │   ├── knowledge/    # Base de conhecimento
-│   │   │   ├── leads/        # Lista de leads
-│   │   │   ├── logs/         # Audit logs
-│   │   │   └── status/       # Status do sistema
-│   │   └── auth/callback/    # OAuth callback
-│   ├── components/
-│   │   ├── layout/           # Sidebar, Header, etc
-│   │   ├── providers/        # Context providers
-│   │   └── ui/               # shadcn/ui components
-│   ├── hooks/                # Custom hooks
-│   └── lib/
-│       ├── supabase/         # Supabase client/server
-│       └── utils.ts          # Utilitarios
-├── middleware.ts             # Auth middleware
-├── Dockerfile                # Build para producao
-└── fly.toml                  # Config Fly.io
-```
-
-## Scripts
-
-| Comando | Descricao |
-|---------|-----------|
-| `npm run dev` | Servidor de desenvolvimento |
-| `npm run build` | Build de producao |
-| `npm run start` | Rodar build de producao |
-| `npm run lint` | Verificar linting |
-| `npm run test:e2e` | Rodar testes E2E (headless) |
-| `npm run test:e2e:ui` | Rodar testes E2E com UI interativa |
-| `npm run test:e2e:headed` | Rodar testes E2E com browser visivel |
-| `npm run test:e2e:debug` | Rodar testes E2E em modo debug |
-| `npm run test:e2e:report` | Abrir relatorio de testes |
-
-## Testes E2E
-
-Os testes E2E sao implementados com [Playwright](https://playwright.dev/) e cobrem os fluxos criticos do painel administrativo.
+- **66 testes E2E** passando
+- Fluxos: Auth, Agent Control, Business Hours, Leads
 
 ### Estrutura de Testes
 
@@ -147,58 +73,133 @@ Os testes E2E sao implementados com [Playwright](https://playwright.dev/) e cobr
 e2e/
 ├── fixtures/
 │   ├── api-mocks.ts      # Mocks para API do backend
-│   └── auth.ts           # Helpers de autenticacao
-├── auth.spec.ts          # Testes de login e autenticacao
-├── status.spec.ts        # Testes do dashboard de status
+│   └── auth.ts           # Helpers de autenticação
+├── auth.spec.ts          # Testes de login/logout
+├── status.spec.ts        # Testes do dashboard
 ├── agent-control.spec.ts # Testes de controle do agente
-├── business-hours.spec.ts# Testes de configuracao de horarios
-└── leads.spec.ts         # Testes de lista e detalhes de leads
+├── business-hours.spec.ts# Testes de horários
+└── leads.spec.ts         # Testes de leads
 ```
 
-### Executando Testes
+## Deploy
+
+### Fly.io
+
+#### Primeiro Deploy
 
 ```bash
-# Rodar todos os testes (headless)
-npm run test:e2e
+# Instalar Fly CLI
+curl -L https://fly.io/install.sh | sh
 
-# Rodar com UI interativa do Playwright
-npm run test:e2e:ui
+# Login
+flyctl auth login
 
-# Rodar um arquivo especifico
-npx playwright test e2e/auth.spec.ts
-
-# Rodar em modo debug
-npm run test:e2e:debug
+# Criar app (primeira vez)
+flyctl apps create seleto-admin-panel
 ```
 
-### Configuracao
+#### Deploy com Script
 
-Os testes usam mocks para a API do backend, permitindo execucao independente. Para testes com backend real, configure as variaveis de ambiente:
+```bash
+# Configurar credenciais
+cp .env.production.example .env.production
+# Editar .env.production
 
-```env
-E2E_TEST_EMAIL=seu@email.com
-E2E_TEST_PASSWORD=suasenha
-NEXT_PUBLIC_API_URL=http://localhost:8000
+# Deploy
+./scripts/deploy.sh
 ```
 
-## Funcionalidades
+#### Deploy Manual
 
-### Implementadas (Phase 1)
-- [x] Autenticacao com Supabase
-- [x] Layout com sidebar responsiva
-- [x] Dark/Light mode
-- [x] Estrutura de rotas protegidas
+```bash
+flyctl deploy \
+  --build-arg NEXT_PUBLIC_SUPABASE_URL="https://xxx.supabase.co" \
+  --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..." \
+  --build-arg NEXT_PUBLIC_API_URL="https://seleto-industrial.fly.dev"
+```
 
-### Implementadas (Phase 2)
-- [x] Dashboard de status das integracoes (`/status`)
-- [x] Controle de pause/resume do agente (`/agent`)
-- [x] Editor de horarios comerciais (`/agent/settings`)
-- [x] Lista de leads com filtros (`/leads`)
-- [x] Visualizacao de conversas (`/leads/[phone]`)
-- [x] Testes E2E com Playwright (144 testes)
+> **Nota:** As variáveis `NEXT_PUBLIC_*` precisam ser passadas como build args pois são injetadas no build time pelo Next.js.
 
-### Planejadas (Phase 3+)
-- [ ] CRUD de produtos (base de conhecimento)
-- [ ] Fila de perguntas tecnicas
-- [ ] Visualizacao de audit logs
-- [ ] Editor de prompts
+### URLs
+
+- **Produção:** https://seleto-admin-panel.fly.dev
+- **API Backend:** https://seleto-industrial.fly.dev
+- **Health Check:** https://seleto-admin-panel.fly.dev/api/health
+
+### Comandos Úteis
+
+```bash
+flyctl status -a seleto-admin-panel  # Ver status
+flyctl logs -a seleto-admin-panel    # Ver logs
+flyctl dashboard -a seleto-admin-panel # Abrir dashboard
+```
+
+## Estrutura
+
+```
+admin-panel/
+├── src/
+│   ├── app/                    # Rotas e páginas (App Router)
+│   │   ├── (auth)/             # Páginas de autenticação
+│   │   │   └── login/
+│   │   ├── (dashboard)/        # Páginas protegidas
+│   │   │   ├── agent/          # Controle do agente
+│   │   │   ├── config/         # Configurações e prompts
+│   │   │   ├── knowledge/      # Base de conhecimento
+│   │   │   ├── leads/          # Lista de leads
+│   │   │   ├── logs/           # Audit logs
+│   │   │   └── status/         # Status do sistema
+│   │   └── api/                # API routes
+│   │       └── health/         # Health check endpoint
+│   ├── components/
+│   │   ├── layout/             # Sidebar, Header
+│   │   ├── providers/          # Context providers
+│   │   └── ui/                 # shadcn/ui components
+│   ├── hooks/                  # React Query hooks
+│   └── lib/
+│       ├── api/                # API client
+│       └── supabase/           # Supabase client/server
+├── e2e/                        # Testes Playwright
+├── scripts/
+│   └── deploy.sh               # Script de deploy
+├── Dockerfile                  # Build para produção
+└── fly.toml                    # Config Fly.io
+```
+
+## Scripts
+
+| Comando | Descrição |
+|---------|-----------|
+| `npm run dev` | Servidor de desenvolvimento |
+| `npm run build` | Build de produção |
+| `npm run start` | Rodar build de produção |
+| `npm run lint` | Verificar linting |
+| `npm run test:e2e` | Rodar testes E2E (headless) |
+| `npm run test:e2e:ui` | Rodar testes E2E com UI |
+| `npm run test:e2e:headed` | Rodar testes E2E com browser |
+| `npm run test:e2e:debug` | Rodar testes E2E em debug |
+| `npm run test:e2e:report` | Abrir relatório de testes |
+
+## Troubleshooting
+
+### Erro de conexão com backend
+
+1. Verifique se `NEXT_PUBLIC_API_URL` está configurado
+2. Verifique se o backend está rodando
+3. Verifique CORS no backend
+
+### Erro de autenticação
+
+1. Verifique as credenciais do Supabase
+2. Limpe cookies e localStorage
+3. Verifique se o email está confirmado
+
+### Build falha no Fly.io
+
+1. Verifique se os build args estão corretos
+2. Verifique logs: `flyctl logs -a seleto-admin-panel`
+3. Teste build local: `docker build -t test .`
+
+## Licença
+
+Proprietary - Seleto Industrial
