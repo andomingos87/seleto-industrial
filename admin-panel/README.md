@@ -131,6 +131,55 @@ admin-panel/
 | `npm run build` | Build de producao |
 | `npm run start` | Rodar build de producao |
 | `npm run lint` | Verificar linting |
+| `npm run test:e2e` | Rodar testes E2E (headless) |
+| `npm run test:e2e:ui` | Rodar testes E2E com UI interativa |
+| `npm run test:e2e:headed` | Rodar testes E2E com browser visivel |
+| `npm run test:e2e:debug` | Rodar testes E2E em modo debug |
+| `npm run test:e2e:report` | Abrir relatorio de testes |
+
+## Testes E2E
+
+Os testes E2E sao implementados com [Playwright](https://playwright.dev/) e cobrem os fluxos criticos do painel administrativo.
+
+### Estrutura de Testes
+
+```
+e2e/
+├── fixtures/
+│   ├── api-mocks.ts      # Mocks para API do backend
+│   └── auth.ts           # Helpers de autenticacao
+├── auth.spec.ts          # Testes de login e autenticacao
+├── status.spec.ts        # Testes do dashboard de status
+├── agent-control.spec.ts # Testes de controle do agente
+├── business-hours.spec.ts# Testes de configuracao de horarios
+└── leads.spec.ts         # Testes de lista e detalhes de leads
+```
+
+### Executando Testes
+
+```bash
+# Rodar todos os testes (headless)
+npm run test:e2e
+
+# Rodar com UI interativa do Playwright
+npm run test:e2e:ui
+
+# Rodar um arquivo especifico
+npx playwright test e2e/auth.spec.ts
+
+# Rodar em modo debug
+npm run test:e2e:debug
+```
+
+### Configuracao
+
+Os testes usam mocks para a API do backend, permitindo execucao independente. Para testes com backend real, configure as variaveis de ambiente:
+
+```env
+E2E_TEST_EMAIL=seu@email.com
+E2E_TEST_PASSWORD=suasenha
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
 ## Funcionalidades
 
@@ -140,12 +189,13 @@ admin-panel/
 - [x] Dark/Light mode
 - [x] Estrutura de rotas protegidas
 
-### Em Desenvolvimento (Phase 2)
-- [ ] Dashboard de status das integracoes
-- [ ] Controle de pause/resume do agente
-- [ ] Editor de horarios comerciais
-- [ ] Lista de leads com filtros
-- [ ] Visualizacao de conversas
+### Implementadas (Phase 2)
+- [x] Dashboard de status das integracoes (`/status`)
+- [x] Controle de pause/resume do agente (`/agent`)
+- [x] Editor de horarios comerciais (`/agent/settings`)
+- [x] Lista de leads com filtros (`/leads`)
+- [x] Visualizacao de conversas (`/leads/[phone]`)
+- [x] Testes E2E com Playwright (144 testes)
 
 ### Planejadas (Phase 3+)
 - [ ] CRUD de produtos (base de conhecimento)
