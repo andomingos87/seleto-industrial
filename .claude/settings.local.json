@@ -47,7 +47,9 @@
       "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -c \"from src.services.pending_operations import OperationType, EntityType, OperationStatus; print\\(''OperationType:'', list\\(OperationType\\)\\); print\\(''EntityType:'', list\\(EntityType\\)\\); print\\(''OperationStatus:'', list\\(OperationStatus\\)\\)\")",
       "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -c \"import src.services.data_retention as dr; print\\([x for x in dir\\(dr\\) if not x.startswith\\(''_''\\)]\\)\")",
       "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -c \"import src.jobs.data_retention_job as drj; print\\([x for x in dir\\(drj\\) if not x.startswith\\(''_''\\)]\\)\")",
-      "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -m ruff:*)"
+      "Bash(\"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\venv\\\\Scripts\\\\python.exe\" -m ruff:*)",
+      "Bash(npm run build:*)",
+      "Bash(dir \"C:\\\\Users\\\\Anderson Domingos\\\\Documents\\\\Projetos\\\\seleto_industrial\\\\admin-panel\\\\.next\\\\standalone\")"
     ]
   },
   "enableAllProjectMcpServers": true,

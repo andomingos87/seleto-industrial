@@ -3,10 +3,12 @@ Seleto Industrial SDR Agent - Entry Point
 """
 
 from agno.os import AgentOS
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.agents.sdr_agent import create_sdr_agent
 from src.api.middleware.logging import LoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
+from src.api.routes.admin import router as admin_router
 from src.api.routes.health import router as health_router
 from src.api.routes.lgpd import router as lgpd_router
 from src.api.routes.metrics import router as metrics_router
@@ -31,6 +33,19 @@ agent_os = AgentOS(
 # Obter app FastAPI
 app = agent_os.get_app()
 
+# Add CORS middleware for admin panel
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "http://localhost:3001",  # Alternative port
+        "https://admin.seleto-industrial.fly.dev",  # Production admin panel
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Add logging middleware
 app.add_middleware(LoggingMiddleware)
 
@@ -43,6 +58,7 @@ app.include_router(webhook_router, tags=["Webhooks"])
 app.include_router(metrics_router, tags=["Metrics"])
 app.include_router(pending_operations_router, tags=["Pending Operations"])
 app.include_router(lgpd_router, tags=["LGPD"])
+app.include_router(admin_router, tags=["Admin"])
 
 # Log startup
 logger.info(
