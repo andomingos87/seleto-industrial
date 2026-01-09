@@ -3,15 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  Activity,
   Bot,
   Clock,
   FileText,
   Home,
-  MessageSquare,
-  Settings,
   Users,
+  Package,
   BookOpen,
+  Settings,
+  Code,
 } from "lucide-react"
 
 import {
@@ -34,11 +34,6 @@ const mainNavItems = [
     href: "/",
     icon: Home,
   },
-  {
-    title: "Status do Sistema",
-    href: "/status",
-    icon: Activity,
-  },
 ]
 
 const agentNavItems = [
@@ -48,9 +43,19 @@ const agentNavItems = [
     icon: Bot,
   },
   {
-    title: "Horarios Comerciais",
-    href: "/agent/settings",
+    title: "Prompt",
+    href: "/prompt",
+    icon: Code,
+  },
+  {
+    title: "Horário Funcionamento",
+    href: "/schedule",
     icon: Clock,
+  },
+  {
+    title: "Parâmetros",
+    href: "/parameters",
+    icon: Settings,
   },
 ]
 
@@ -61,9 +66,9 @@ const dataNavItems = [
     icon: Users,
   },
   {
-    title: "Base de Conhecimento",
-    href: "/knowledge",
-    icon: BookOpen,
+    title: "Produtos",
+    href: "/products",
+    icon: Package,
   },
 ]
 
@@ -74,9 +79,9 @@ const systemNavItems = [
     icon: FileText,
   },
   {
-    title: "Configuracoes",
-    href: "/config",
-    icon: Settings,
+    title: "Documentação",
+    href: "/docs",
+    icon: BookOpen,
   },
 ]
 
@@ -136,10 +141,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={
-                      pathname === item.href ||
-                      (item.href !== "/" && pathname.startsWith(item.href))
-                    }
+                    isActive={pathname === item.href}
                     tooltip={item.title}
                   >
                     <Link href={item.href}>
@@ -204,22 +206,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Documentacao">
-              <a
-                href="https://github.com/seleto-industrial/sdr-agent"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <MessageSquare className="size-4" />
-                <span>Documentacao</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
+      <SidebarFooter />
 
       <SidebarRail />
     </Sidebar>

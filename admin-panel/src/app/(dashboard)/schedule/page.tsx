@@ -49,7 +49,7 @@ interface DaySchedule {
 
 type ScheduleState = Record<DayKey, DaySchedule>
 
-export default function AgentSettingsPage() {
+export default function SchedulePage() {
   const { data, isLoading, isError, error, refetch } = useBusinessHours()
   const updateBusinessHours = useUpdateBusinessHours()
 
@@ -140,7 +140,7 @@ export default function AgentSettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Horários Comerciais</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Horário de Funcionamento</h1>
           <p className="text-muted-foreground">
             Configure os horários de funcionamento do agente
           </p>

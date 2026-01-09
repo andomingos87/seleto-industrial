@@ -12,8 +12,8 @@ test.describe('Business Hours Configuration', () => {
   test.beforeEach(async ({ page }) => {
     await setupApiMocks(page);
     
-    // Navigate to settings page
-    await page.goto('/agent/settings');
+    // Navigate to schedule page (previously /agent/settings)
+    await page.goto('/schedule');
     
     // Check if we were redirected to login (not authenticated)
     if (page.url().includes('/login')) {
@@ -23,7 +23,7 @@ test.describe('Business Hours Configuration', () => {
 
   test('should display business hours page with correct elements', async ({ page }) => {
     // Check page title
-    await expect(page.locator('h1:has-text("Horários Comerciais")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Horário de Funcionamento")')).toBeVisible();
     await expect(page.locator('text=Configure os horários de funcionamento')).toBeVisible();
   });
 
@@ -34,7 +34,7 @@ test.describe('Business Hours Configuration', () => {
   });
 
   test('should display all days of the week', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Check all days are present
     const days = [
@@ -63,7 +63,7 @@ test.describe('Business Hours Configuration', () => {
   });
 
   test('should allow toggling a day on/off', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Find the switch for Saturday (should be off)
     const switches = page.locator('button[role="switch"]');
@@ -79,7 +79,7 @@ test.describe('Business Hours Configuration', () => {
   });
 
   test('should allow changing time inputs', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Find time inputs for Monday
     const timeInputs = page.locator('input[type="time"]');
@@ -101,7 +101,7 @@ test.describe('Business Hours Configuration', () => {
   });
 
   test('should allow changing timezone', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Click timezone dropdown
     await page.locator('button:has-text("São Paulo")').click();
@@ -114,7 +114,7 @@ test.describe('Business Hours Configuration', () => {
   });
 
   test('should have save and discard buttons', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Check buttons exist
     await expect(page.locator('button:has-text("Salvar Alterações")')).toBeVisible();
@@ -126,7 +126,7 @@ test.describe('Business Hours Configuration', () => {
   });
 
   test('should enable save button after making changes', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Make a change
     const timeInputs = page.locator('input[type="time"]');
@@ -137,7 +137,7 @@ test.describe('Business Hours Configuration', () => {
   });
 
   test('should save changes successfully', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Make a change
     const timeInputs = page.locator('input[type="time"]');
@@ -151,7 +151,7 @@ test.describe('Business Hours Configuration', () => {
   });
 
   test('should discard changes when clicking discard', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Make a change
     const timeInputs = page.locator('input[type="time"]');
@@ -171,7 +171,7 @@ test.describe('Business Hours Configuration', () => {
   // The error handling is tested via unit tests in the backend
 
   test('should disable time inputs for closed days', async ({ page }) => {
-    await page.goto('/agent/settings');
+    await page.goto('/schedule');
 
     // Find time inputs - Saturday and Sunday should have disabled inputs
     // There are 14 time inputs total (2 per day)

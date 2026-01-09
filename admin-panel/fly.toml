@@ -8,9 +8,9 @@ primary_region = "gru"
   dockerfile = "Dockerfile"
 
 [build.args]
-  NEXT_PUBLIC_SUPABASE_URL = ""
-  NEXT_PUBLIC_SUPABASE_ANON_KEY = ""
-  NEXT_PUBLIC_API_URL = ""
+  NEXT_PUBLIC_SUPABASE_URL = "https://gkphicbjurtiiizsuhdy.supabase.co"
+  NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcGhpY2JqdXJ0aWlpenN1aGR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4ODk3MDMsImV4cCI6MjA4MTQ2NTcwM30.MGNu_Fk1bPMrTSBWRXal17j_22Pk_npmKBU6bVA_w0w"
+  NEXT_PUBLIC_API_URL = "https://seleto-industrial.fly.dev"
 
 [env]
   NODE_ENV = "production"

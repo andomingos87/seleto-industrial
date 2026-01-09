@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { BookOpen, Plus, Search, Pencil, Trash2, Check, X, MessageSquareWarning } from "lucide-react"
+import { Package, Plus, Search, Pencil, Trash2, Check, X, MessageSquareWarning } from "lucide-react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -60,7 +60,7 @@ const CATEGORY_COLORS: Record<ProductCategory, string> = {
   linha_automatica: "bg-pink-500/10 text-pink-500 border-pink-500/20",
 }
 
-export default function KnowledgePage() {
+export default function ProductsPage() {
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState<ProductCategory | "all">("all")
   const [page, setPage] = useState(1)
@@ -99,8 +99,8 @@ export default function KnowledgePage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Base de Conhecimento</h1>
-          <p className="text-muted-foreground">Gerencie produtos e informações do agente</p>
+          <h1 className="text-3xl font-bold tracking-tight">Produtos</h1>
+          <p className="text-muted-foreground">Gerencie os produtos do catálogo</p>
         </div>
         <Card>
           <CardContent className="pt-6">
@@ -115,11 +115,11 @@ export default function KnowledgePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Base de Conhecimento</h1>
-          <p className="text-muted-foreground">Gerencie produtos e informações do agente</p>
+          <h1 className="text-3xl font-bold tracking-tight">Produtos</h1>
+          <p className="text-muted-foreground">Gerencie os produtos do catálogo</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/knowledge/questions">
+          <Link href="/products/questions">
             <Button variant="outline" className="relative">
               <MessageSquareWarning className="mr-2 h-4 w-4" />
               Perguntas Técnicas
@@ -175,7 +175,7 @@ export default function KnowledgePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
+            <Package className="h-5 w-5" />
             Produtos Cadastrados
             {data && (
               <Badge variant="secondary" className="ml-2">
@@ -324,7 +324,7 @@ export default function KnowledgePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. O produto será permanentemente removido da base de conhecimento.
+              Esta ação não pode ser desfeita. O produto será permanentemente removido do catálogo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

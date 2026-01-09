@@ -61,7 +61,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function PromptsPage() {
+export default function PromptPage() {
   const [selectedPrompt, setSelectedPrompt] = useState<string>("")
   const [editorContent, setEditorContent] = useState<string>("")
   const [hasChanges, setHasChanges] = useState(false)
@@ -145,8 +145,8 @@ export default function PromptsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Editor de Prompts</h1>
-          <p className="text-muted-foreground">Edite os prompts do sistema</p>
+          <h1 className="text-3xl font-bold tracking-tight">System Prompt</h1>
+          <p className="text-muted-foreground">Edite o prompt do sistema</p>
         </div>
         <Card>
           <CardContent className="pt-6">
@@ -161,9 +161,9 @@ export default function PromptsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Editor de Prompts</h1>
+          <h1 className="text-3xl font-bold tracking-tight">System Prompt</h1>
           <p className="text-muted-foreground">
-            Edite os prompts do sistema (apenas para desenvolvedores)
+            Edite o prompt do sistema (apenas para desenvolvedores)
           </p>
         </div>
         <div className="flex gap-2">

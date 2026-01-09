@@ -103,7 +103,7 @@ export default function TechnicalQuestionsPage() {
             Perguntas que requerem resposta de um especialista
           </p>
         </div>
-        <Link href="/knowledge">
+        <Link href="/products">
           <Button variant="outline">
             Voltar para Produtos
           </Button>

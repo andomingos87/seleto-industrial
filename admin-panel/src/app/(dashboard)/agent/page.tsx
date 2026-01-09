@@ -35,16 +35,19 @@ export default function AgentPage() {
       return
     }
 
+    const phone = phoneInput.trim()
     try {
-      const result = await pauseAgent.mutateAsync({ phone: phoneInput.trim() })
+      const result = await pauseAgent.mutateAsync({ phone })
       if (result.success) {
-        toast.success(result.message)
+        toast.success(result.message || `Agente pausado para ${phone}`)
         setPhoneInput("")
       } else {
-        toast.error(result.message)
+        toast.error(result.message || "Falha ao pausar agente")
       }
-    } catch {
-      toast.error("Erro ao pausar agente")
+    } catch (err) {
+      toast.error("Erro ao pausar agente", {
+        description: err instanceof Error ? err.message : "Tente novamente"
+      })
     }
   }
 
@@ -52,12 +55,14 @@ export default function AgentPage() {
     try {
       const result = await resumeAgent.mutateAsync({ phone })
       if (result.success) {
-        toast.success(result.message)
+        toast.success(result.message || `Agente retomado para ${phone}`)
       } else {
-        toast.error(result.message)
+        toast.error(result.message || "Falha ao retomar agente")
       }
-    } catch {
-      toast.error("Erro ao retomar agente")
+    } catch (err) {
+      toast.error("Erro ao retomar agente", {
+        description: err instanceof Error ? err.message : "Tente novamente"
+      })
     }
   }
 
@@ -65,12 +70,14 @@ export default function AgentPage() {
     try {
       const result = await reloadPrompt.mutateAsync()
       if (result.success) {
-        toast.success(result.message)
+        toast.success(result.message || "Prompt recarregado com sucesso")
       } else {
-        toast.error(result.message)
+        toast.error(result.message || "Falha ao recarregar prompt")
       }
-    } catch {
-      toast.error("Erro ao recarregar prompt")
+    } catch (err) {
+      toast.error("Erro ao recarregar prompt", {
+        description: err instanceof Error ? err.message : "Tente novamente"
+      })
     }
   }
 
