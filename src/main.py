@@ -39,7 +39,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Local development
         "http://localhost:3001",  # Alternative port
-        "https://admin.seleto-industrial.fly.dev",  # Production admin panel
+        "https://seleto-admin-panel.fly.dev",  # Production admin panel
     ],
     allow_credentials=True,
     allow_methods=["*"],
